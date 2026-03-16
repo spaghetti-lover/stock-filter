@@ -16,7 +16,8 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
-            cd ~/stock-filter
+            cd /root/stock-filter
+            source .venv/bin/activate
             git pull origin main
             pip install -r requirements.txt
             sudo systemctl restart stock-filter
