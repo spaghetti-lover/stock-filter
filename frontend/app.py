@@ -10,6 +10,7 @@ from filters import (
     MIN_HISTORY_SESSIONS,
     MIN_PRICE,
     MIN_INTRADAY_RATIO,
+    MIN_VOLUME,
 )
 
 st.set_page_config(page_title="Vietnam Stock Filter", page_icon="📈", layout="wide")
@@ -21,13 +22,17 @@ st.caption(f"Data as of: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} (simulat
 with st.sidebar:
     st.header("Filter Options")
 
+    use_exchange = st.toggle("Exchange", value=True)
     exchanges = st.multiselect(
         "Exchange",
         options=["HOSE", "HNX", "UPCOM"],
         default=["HOSE", "HNX"],
         help="Only include stocks listed on the selected exchanges.",
+        disabled=not use_exchange,
+        label_visibility="collapsed",
     )
 
+    use_gtgd20 = st.toggle("Min GTGD20 (billion VND)", value=True)
     min_gtgd20 = st.number_input(
         "Min GTGD20 (billion VND)",
         min_value=1.0,
@@ -35,15 +40,21 @@ with st.sidebar:
         value=20.0,
         step=1.0,
         help="Average trading value of the last 20 sessions must be >= this value.",
+        disabled=not use_gtgd20,
+        label_visibility="collapsed",
     )
 
+    use_status = st.toggle("Allowed trading statuses", value=True)
     allowed_statuses_labels = st.multiselect(
         "Allowed trading statuses",
         options=["normal", "warning", "control", "restriction"],
         default=["normal"],
         help="Exclude stocks not in the selected statuses.",
+        disabled=not use_status,
+        label_visibility="collapsed",
     )
 
+    use_history = st.toggle("Min history (sessions)", value=True)
     min_history = st.number_input(
         "Min history (sessions)",
         min_value=1,
@@ -51,8 +62,11 @@ with st.sidebar:
         value=MIN_HISTORY_SESSIONS,
         step=5,
         help="Stock must have at least this many trading sessions of historical data.",
+        disabled=not use_history,
+        label_visibility="collapsed",
     )
 
+    use_price = st.toggle("Min price (VND)", value=True)
     min_price = st.number_input(
         "Min price (VND)",
         min_value=100,
@@ -60,8 +74,23 @@ with st.sidebar:
         value=int(MIN_PRICE),
         step=500,
         help="Current price must be >= this value.",
+        disabled=not use_price,
+        label_visibility="collapsed",
     )
 
+    use_volume = st.toggle("Min volume (million VND)", value=True)
+    min_volume_m = st.number_input(
+        "Min volume (million VND)",
+        min_value=0.0,
+        max_value=10_000.0,
+        value=MIN_VOLUME / 1e6,
+        step=1.0,
+        help="Today's trading volume (value) must be >= this amount.",
+        disabled=not use_volume,
+        label_visibility="collapsed",
+    )
+
+    use_intraday = st.toggle("Min intraday activity (%)", value=True)
     min_intraday_pct = st.slider(
         "Min intraday activity (%)",
         min_value=0,
@@ -72,6 +101,8 @@ with st.sidebar:
             "Today's trading value up to now must be >= X% of the expected value "
             "at this time of day (based on 20-session average)."
         ),
+        disabled=not use_intraday,
+        label_visibility="collapsed",
     )
 
     st.divider()
@@ -93,6 +124,14 @@ passed, rejected = apply_filters(
     min_history=min_history,
     min_price=min_price,
     min_intraday_ratio=min_intraday_pct / 100,
+    min_volume=min_volume_m * 1e6,
+    use_exchange=use_exchange,
+    use_gtgd20=use_gtgd20,
+    use_status=use_status,
+    use_history=use_history,
+    use_price=use_price,
+    use_intraday=use_intraday,
+    use_volume=use_volume,
 )
 
 # ── Summary metrics ───────────────────────────────────────────────────────────
