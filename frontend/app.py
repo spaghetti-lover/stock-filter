@@ -2,9 +2,9 @@
 
 import streamlit as st
 import pandas as pd
+import requests
 from datetime import datetime
 
-from fake_api import fetch_stock_list
 from filters import (
     apply_filters,
     MIN_HISTORY_SESSIONS,
@@ -114,7 +114,7 @@ if not run:
     st.stop()
 
 with st.spinner("Fetching data from API…"):
-    raw_stocks = fetch_stock_list()
+    raw_stocks = requests.get("http://localhost:8000/stocks").json()
 
 passed, rejected = apply_filters(
     raw_stocks,
