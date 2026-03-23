@@ -1,6 +1,9 @@
 import os
 from datetime import datetime, timedelta
 from vnstock import Vnstock, change_api_key
+from logger import get_logger
+
+log = get_logger(__name__)
 
 _api_key = os.environ.get("VNSTOCK_API_KEY", "")
 if _api_key:
@@ -9,14 +12,18 @@ if _api_key:
 
 def get_all_symbols() -> list[dict]:
   """Get all stock symbols from HOSE and HNX exchanges."""
+  log.debug("Fetching all symbols")
   stock = Vnstock().stock(symbol="VN30F1M", source="VCI")
   df = stock.listing.symbols_by_exchange()
   df = df[df["exchange"].isin(["HOSE", "HNX"])]
-  return df[["symbol", "exchange"]].to_dict(orient="records")
+  symbols = df[["symbol", "exchange"]].to_dict(orient="records")
+  log.info("Fetched %d symbols", len(symbols))
+  return symbols
 
 
 def get_trading_history(symbol: str, days: int = 100) -> list[dict]:
   """Get daily OHLCV history for a symbol."""
+  log.debug("Fetching trading history: symbol=%s days=%d", symbol, days)
   stock = Vnstock().stock(symbol=symbol, source="VCI")
   end = datetime.now().strftime("%Y-%m-%d")
   start = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
@@ -26,6 +33,7 @@ def get_trading_history(symbol: str, days: int = 100) -> list[dict]:
 
 def get_intraday(symbol: str) -> list[dict]:
   """Get intraday snapshots for a symbol."""
+  log.debug("Fetching intraday: symbol=%s", symbol)
   stock = Vnstock().stock(symbol=symbol, source="VCI")
   df = stock.quote.intraday()
   return df.to_dict(orient="records")

@@ -3,6 +3,9 @@ from datetime import datetime
 from domain.entities.stock import Stock
 from domain.repositories.stock_repository import StockRepository
 from crawler.crawler import get_all_symbols, get_trading_history, get_intraday
+from logger import get_logger
+
+log = get_logger(__name__)
 
 INTRADAY_TIME_SLOTS = [
     (9, 0), (9, 30), (10, 0), (10, 30), (11, 0), (11, 30),
@@ -31,18 +34,24 @@ class StockRepositoryImpl(StockRepository):
         now = datetime.now()
         expected_fraction = _get_expected_fraction_at_time(now.hour, now.minute)
 
+        log.info("list_stocks started: exchanges=%s min_gtgd=%s fraction=%.2f", exchanges, min_gtgd, expected_fraction)
+
         symbols = get_all_symbols()  # [{"symbol": ..., "exchange": ...}]
         if exchanges:
             symbols = [s for s in symbols if s["exchange"] in exchanges]
+        log.info("Processing %d symbols", len(symbols))
 
         result = []
-        for item in symbols:
+        for i, item in enumerate(symbols):
             symbol = item["symbol"]
             exchange = item["exchange"]
+
+            log.debug("[%d/%d] Processing %s (%s)", i + 1, len(symbols), symbol, exchange)
 
             # --- trading history: current_price, gtgd20, history_sessions ---
             history_rows = get_trading_history(symbol, days=60)
             if not history_rows:
+                log.warning("No history for %s, skipping", symbol)
                 continue
 
             current_price = history_rows[-1]["close"]
@@ -51,6 +60,7 @@ class StockRepositoryImpl(StockRepository):
             gtgd20 = sum(last20_values) / len(last20_values) # Gia tri giao dich 20 ngay gan nhat
 
             if gtgd20 < min_gtgd:
+                log.debug("Skipping %s: gtgd20=%.0f < min_gtgd=%.0f", symbol, gtgd20, min_gtgd)
                 continue
 
             # --- intraday: today_value ---
@@ -71,4 +81,5 @@ class StockRepositoryImpl(StockRepository):
                 avg_intraday_expected=avg_intraday_expected,
             ))
 
+        log.info("list_stocks done: %d stocks returned", len(result))
         return result

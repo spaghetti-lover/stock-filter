@@ -2,7 +2,9 @@ from fastapi import APIRouter, Depends, Query
 from application.use_case.get_stock import GetStockUseCase
 from application.dto.stock_dto import GetStockResponse
 from infrastructure.stock_repository_impl import StockRepositoryImpl
+from logger import get_logger
 
+log = get_logger(__name__)
 router = APIRouter()
 
 
@@ -16,4 +18,11 @@ def get_stock(
     min_gtgd: float = Query(default=0.0, ge=0.0),
     usecase: GetStockUseCase = Depends(get_usecase),
 ):
-    return usecase.execute(exchanges=set(exchanges), min_gtgd=min_gtgd)
+    log.info("GET /stocks exchanges=%s min_gtgd=%s", exchanges, min_gtgd)
+    try:
+        result = usecase.execute(exchanges=set(exchanges), min_gtgd=min_gtgd)
+        log.info("GET /stocks -> %d results", len(result))
+        return result
+    except Exception:
+        log.error("GET /stocks failed", exc_info=True)
+        raise
