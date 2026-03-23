@@ -4,22 +4,21 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from logger import setup_logging, get_logger
-setup_logging()
+setup_logging(latest_only=True)
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from presentation.api.routes import stock
 
 log = get_logger(__name__)
 
-app = FastAPI()
-app.include_router(stock.router, tags=["Stock"])
 
-
-@app.on_event("startup")
-async def on_startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     log.info("Server started")
-
-
-@app.on_event("shutdown")
-async def on_shutdown():
+    yield
     log.info("Server shutting down")
+
+
+app = FastAPI(lifespan=lifespan)
+app.include_router(stock.router, tags=["Stock"])

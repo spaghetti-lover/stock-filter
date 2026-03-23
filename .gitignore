@@ -1,3 +1,7 @@
 .venv
 .env
-.pytest_cache/``
+.pytest_cache/
+backend/errors.log
+__pycache__/
+*.pyc
+*.pyo

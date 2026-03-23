@@ -23,6 +23,6 @@ def get_stock(
         result = usecase.execute(exchanges=set(exchanges), min_gtgd=min_gtgd)
         log.info("GET /stocks -> %d results", len(result))
         return result
-    except Exception:
+    except BaseException:
         log.error("GET /stocks failed", exc_info=True)
         raise
