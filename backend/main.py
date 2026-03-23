@@ -1,7 +1,8 @@
 # main.py
 
 from dotenv import load_dotenv
-load_dotenv()
+from pathlib import Path
+load_dotenv(Path(__file__).parent.parent / ".env")
 
 from logger import setup_logging, get_logger
 setup_logging(latest_only=True)

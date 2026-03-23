@@ -23,6 +23,17 @@
       "cwd": "${fileDirname}",
       "console": "integratedTerminal",
       "justMyCode": false
+    },
+    {
+      "name": "Debug: FastAPI app",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["backend.main:app", "--reload"],
+      "cwd": "${workspaceFolder}",
+      "env": {"PYTHONPATH": "${workspaceFolder}/backend"},
+      "console": "integratedTerminal",
+      "justMyCode": false
     }
   ]
 }
