@@ -27,7 +27,7 @@ def _get_expected_fraction_at_time(hour: int, minute: int) -> float:
 
 
 class StockRepositoryImpl(StockRepository):
-    def list_stocks(self, exchanges: set[str] | None = None):
+    def list_stocks(self, exchanges: set[str] | None = None, min_gtgd: float = 0.0):
         now = datetime.now()
         expected_fraction = _get_expected_fraction_at_time(now.hour, now.minute)
 
@@ -49,6 +49,9 @@ class StockRepositoryImpl(StockRepository):
             history_sessions = len(history_rows)
             last20_values = [r["value"] for r in history_rows[-20:]]
             gtgd20 = sum(last20_values) / len(last20_values) # Gia tri giao dich 20 ngay gan nhat
+
+            if gtgd20 < min_gtgd:
+                continue
 
             # --- intraday: today_value ---
             intraday_rows = get_intraday(symbol)

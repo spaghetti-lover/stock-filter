@@ -32,9 +32,9 @@ with st.sidebar:
         label_visibility="collapsed",
     )
 
-    use_gtgd20 = st.toggle("Min GTGD20 (billion VND)", value=True)
+    use_gtgd20 = st.toggle("Min GTGD (billion VND)", value=True)
     min_gtgd20 = st.number_input(
-        "Min GTGD20 (billion VND)",
+        "Min GTGD (billion VND)",
         min_value=1.0,
         max_value=500.0,
         value=20.0,
@@ -156,7 +156,7 @@ def build_df(stocks: list[dict], include_reason: bool = False) -> pd.DataFrame:
             "Exchange": s["exchange"],
             "Status": s["status"],
             "Price (VND)": f"{s['current_price']:,}",
-            "GTGD20 (B)": f"{s['gtgd20']/1e9:.1f}",
+            "GTGD (B)": f"{s['gtgd20']/1e9:.1f}",
             "History (sessions)": s["history_sessions"],
             "Today value (B)": f"{s['today_value']/1e9:.2f}",
             "Expected by now (B)": f"{s['avg_intraday_expected']/1e9:.2f}",
