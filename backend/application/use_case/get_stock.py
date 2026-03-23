@@ -6,6 +6,6 @@ class GetStockUseCase:
     def __init__(self, repo: StockRepository):
         self.repo = repo
 
-    def execute(self):
-        stocks = self.repo.list_stocks()
+    def execute(self, exchanges: set[str] | None = None):
+        stocks = self.repo.list_stocks(exchanges=exchanges)
         return StockMapper.to_response_list(stocks)

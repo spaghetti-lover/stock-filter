@@ -27,11 +27,13 @@ def _get_expected_fraction_at_time(hour: int, minute: int) -> float:
 
 
 class StockRepositoryImpl(StockRepository):
-    def list_stocks(self):
+    def list_stocks(self, exchanges: set[str] | None = None):
         now = datetime.now()
         expected_fraction = _get_expected_fraction_at_time(now.hour, now.minute)
 
         symbols = get_all_symbols()  # [{"symbol": ..., "exchange": ...}]
+        if exchanges:
+            symbols = [s for s in symbols if s["exchange"] in exchanges]
 
         result = []
         for item in symbols:

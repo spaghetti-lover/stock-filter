@@ -5,5 +5,5 @@ from domain.entities.stock import Stock
 
 class StockRepository(ABC):
     @abstractmethod
-    def list_stocks(self) -> list[Stock]:
+    def list_stocks(self, exchanges: set[str] | None = None) -> list[Stock]:
         pass
