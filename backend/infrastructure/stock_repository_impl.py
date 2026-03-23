@@ -47,7 +47,7 @@ class StockRepositoryImpl(StockRepository):
 
             current_price = history_rows[-1]["close"]
             history_sessions = len(history_rows)
-            last20_values = [r["value"] for r in history_rows[-20:]]
+            last20_values = [r["close"] * r["volume"] for r in history_rows[-20:]]
             gtgd20 = sum(last20_values) / len(last20_values) # Gia tri giao dich 20 ngay gan nhat
 
             if gtgd20 < min_gtgd:
@@ -55,7 +55,7 @@ class StockRepositoryImpl(StockRepository):
 
             # --- intraday: today_value ---
             intraday_rows = get_intraday(symbol)
-            today_value = sum(r["value"] for r in intraday_rows) if intraday_rows else 0.0
+            today_value = sum(r["price"] * r["volume"] for r in intraday_rows) if intraday_rows else 0.0
 
             # --- avg_intraday_expected: gtgd20 scaled by current time fraction ---
             avg_intraday_expected = gtgd20 * expected_fraction

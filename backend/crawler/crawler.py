@@ -1,5 +1,10 @@
+import os
 from datetime import datetime, timedelta
-from vnstock import Vnstock
+from vnstock import Vnstock, change_api_key
+
+_api_key = os.environ.get("VNSTOCK_API_KEY", "")
+if _api_key:
+    change_api_key(_api_key)
 
 
 def get_all_symbols() -> list[dict]:
