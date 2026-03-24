@@ -13,6 +13,7 @@ description: Summarize staged changes and create a git commit without Co-Authore
 
 1. Summarize the staged changes to the user (new files, modified files, what each change does).
 2. Create a single git commit for the staged changes only (do NOT stage unstaged files).
+3. After committing, write a brief summary of what was committed (commit hash, message, and key changes).
 
 Rules:
 
