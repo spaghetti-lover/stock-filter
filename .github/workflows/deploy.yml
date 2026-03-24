@@ -20,4 +20,5 @@ jobs:
             source .venv/bin/activate
             git pull origin main
             pip install -r requirements.txt
-            sudo systemctl restart stock-filter
+            sudo systemctl restart stock-filter-backend stock-filter-frontend
+            make migrate

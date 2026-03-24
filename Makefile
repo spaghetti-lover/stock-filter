@@ -12,3 +12,6 @@ db_start:
 
 db_stop:
 	docker stop stock_db && docker rm stock_db
+
+migrate:
+	psql "postgresql://postgres:password@localhost:5432/stock_data" -f backend/db/migrations/001_create_stocks.sql
