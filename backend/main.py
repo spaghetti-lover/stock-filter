@@ -10,15 +10,18 @@ setup_logging(latest_only=True)
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from presentation.api.routes import stock
+from db.connection import init_pool, close_pool
 
 log = get_logger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    await init_pool()
     log.info("Server started")
     yield
     log.info("Server shutting down")
+    await close_pool()
 
 
 app = FastAPI(lifespan=lifespan)

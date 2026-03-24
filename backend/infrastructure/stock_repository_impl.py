@@ -13,6 +13,7 @@ INTRADAY_TIME_SLOTS = [
 ]
 INTRADAY_CUMULATIVE = [0.12, 0.22, 0.30, 0.37, 0.43, 0.48, 0.56, 0.65, 0.75, 0.86, 1.00]
 
+
 def _get_expected_fraction_at_time(hour: int, minute: int) -> float:
     for i, (h, m) in enumerate(INTRADAY_TIME_SLOTS):
         if (hour, minute) <= (h, m):
@@ -30,13 +31,13 @@ def _get_expected_fraction_at_time(hour: int, minute: int) -> float:
 
 
 class StockRepositoryImpl(StockRepository):
-    def list_stocks(self, exchanges: set[str] | None = None, min_gtgd: float = 0.0):
+    async def list_stocks(self, exchanges: set[str] | None = None, min_gtgd: float = 0.0) -> list[Stock]:
         now = datetime.now()
         expected_fraction = _get_expected_fraction_at_time(now.hour, now.minute)
 
         log.info("list_stocks started: exchanges=%s min_gtgd=%s fraction=%.2f", exchanges, min_gtgd, expected_fraction)
 
-        symbols = get_all_symbols()  # [{"symbol": ..., "exchange": ...}]
+        symbols = get_all_symbols()
         if exchanges:
             symbols = [s for s in symbols if s["exchange"] in exchanges]
         log.info("Processing %d symbols", len(symbols))
@@ -48,7 +49,6 @@ class StockRepositoryImpl(StockRepository):
 
             log.debug("[%d/%d] Processing %s (%s)", i + 1, len(symbols), symbol, exchange)
 
-            # --- trading history: current_price, gtgd20, history_sessions ---
             history_rows = get_trading_history(symbol, days=60)
             if not history_rows:
                 log.warning("No history for %s, skipping", symbol)
@@ -57,17 +57,15 @@ class StockRepositoryImpl(StockRepository):
             current_price = history_rows[-1]["close"]
             history_sessions = len(history_rows)
             last20_values = [r["close"] * r["volume"] for r in history_rows[-20:]]
-            gtgd20 = sum(last20_values) / len(last20_values) # Gia tri giao dich 20 ngay gan nhat
+            gtgd20 = sum(last20_values) / len(last20_values)
 
             if gtgd20 < min_gtgd:
                 log.debug("Skipping %s: gtgd20=%.0f < min_gtgd=%.0f", symbol, gtgd20, min_gtgd)
                 continue
 
-            # --- intraday: today_value ---
             intraday_rows = get_intraday(symbol)
             today_value = sum(r["price"] * r["volume"] for r in intraday_rows) if intraday_rows else 0.0
 
-            # --- avg_intraday_expected: gtgd20 scaled by current time fraction ---
             avg_intraday_expected = gtgd20 * expected_fraction
 
             result.append(Stock(
