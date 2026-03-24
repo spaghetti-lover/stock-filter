@@ -1,6 +1,4 @@
-import asyncio
 import os
-import sys
 import time
 import threading
 from collections import deque
@@ -117,15 +115,3 @@ async def run_full_crawl(history_days: int = 60):
         log.info("run_full_crawl: done")
     finally:
         await close_pool()
-
-
-if __name__ == "__main__":
-    backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    if backend_dir not in sys.path:
-        sys.path.insert(0, backend_dir)
-
-    from dotenv import load_dotenv
-    from pathlib import Path
-    load_dotenv(Path(__file__).parent.parent.parent / ".env")
-
-    asyncio.run(run_full_crawl())
