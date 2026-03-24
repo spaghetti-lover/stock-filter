@@ -1,6 +1,6 @@
 ---
-allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git add:*), Bash(git commit:*), Bash(git push:*)
-description: Summarize staged changes, create a git commit without Co-Authored-By, then push
+allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git commit:*)
+description: Summarize staged changes and create a git commit without Co-Authored-By
 ---
 
 ## Context
@@ -11,15 +11,13 @@ description: Summarize staged changes, create a git commit without Co-Authored-B
 
 ## Your task
 
-1. Stage the selected files with `git add`.
-2. Summarize the staged changes (new files, modified files, what each change does).
-3. Create a git commit for the staged changes.
-4. Push the commit to the remote with `git push`.
-5. After pushing, write a brief summary of what was committed and pushed (commit hash, message, and key changes).
+1. Create a single git commit for the staged changes only (do NOT stage unstaged files).
+2. Summarize the staged changes to the user (new files, modified files, what each change does) in the commit description
+3. After committing, write a brief summary of what was committed (commit hash, message, and key changes).
 
 Rules:
 
+- Commit only what is already staged (`git diff --cached`)
 - Do NOT add `Co-Authored-By` or any trailer lines
 - Use a concise, descriptive commit message following the style of recent commits
 - Pass the commit message via heredoc to avoid shell escaping issues
-- Only push after the commit succeeds
