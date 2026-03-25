@@ -73,24 +73,34 @@ def get_intraday(symbol: str) -> list[dict]:
 
 async def run_full_crawl(history_days: int = 60):
     """Crawl all symbols and persist to DB."""
-    from db.connection import init_pool, close_pool
     from crawler.db_writer import write_symbols, write_trading_history, write_stock_metrics, write_intraday
+    from crawler.state import get_state
 
-    await init_pool()
+    state = get_state()
+    state.status = "running"
+    state.started_at = datetime.now()
+    state.finished_at = None
+    state.processed = 0
+    state.total = 0
+    state.current_symbol = ""
+    state.error = ""
     today = date.today()
 
     try:
         symbols = get_all_symbols()
         await write_symbols(symbols)
-        log.info("run_full_crawl: processing %d symbols", len(symbols))
+        state.total = len(symbols)
+        log.info("run_full_crawl: processing %d symbols", state.total)
 
         for i, item in enumerate(symbols):
             symbol = item["symbol"]
-            log.info("[%d/%d] Crawling %s", i + 1, len(symbols), symbol)
+            state.current_symbol = symbol
+            log.info("[%d/%d] Crawling %s", i + 1, state.total, symbol)
 
             history_rows = get_trading_history(symbol, days=history_days)
             if not history_rows:
                 log.warning("No history for %s, skipping", symbol)
+                state.processed += 1
                 continue
 
             await write_trading_history(symbol, history_rows)
@@ -108,10 +118,22 @@ async def run_full_crawl(history_days: int = 60):
                 metrics_date=today,
             )
 
-            intraday_rows = get_intraday(symbol)
-            if intraday_rows:
-                await write_intraday(symbol, today, intraday_rows)
+            try:
+                intraday_rows = get_intraday(symbol)
+                if intraday_rows:
+                    await write_intraday(symbol, today, intraday_rows)
+            except Exception as e:
+                log.warning("Skipping intraday for %s: %s", symbol, e)
 
+            state.processed += 1
+
+        state.status = "done"
+        state.current_symbol = ""
         log.info("run_full_crawl: done")
+    except Exception as e:
+        state.status = "error"
+        state.error = str(e)
+        log.error("run_full_crawl failed: %s", e, exc_info=True)
+        raise
     finally:
-        await close_pool()
+        state.finished_at = datetime.now()

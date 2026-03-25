@@ -9,7 +9,7 @@ setup_logging(latest_only=True)
 
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from presentation.api.routes import stock
+from presentation.api.routes import stock, crawler
 from db.connection import init_pool, close_pool
 
 log = get_logger(__name__)
@@ -26,3 +26,4 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 app.include_router(stock.router, tags=["Stock"])
+app.include_router(crawler.router, tags=["Crawler"])
