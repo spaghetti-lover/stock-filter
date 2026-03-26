@@ -56,7 +56,7 @@ class StockRepositoryImpl(StockRepository):
 
             current_price = history_rows[-1]["close"]
             history_sessions = len(history_rows)
-            last20_values = [r["close"] * r["volume"] for r in history_rows[-20:]]
+            last20_values = [r["close"] * 1000 * r["volume"] for r in history_rows[-20:]]
             gtgd20 = sum(last20_values) / len(last20_values)
 
             if gtgd20 < min_gtgd:
@@ -64,7 +64,7 @@ class StockRepositoryImpl(StockRepository):
                 continue
 
             intraday_rows = get_intraday(symbol)
-            today_value = sum(r["price"] * r["volume"] for r in intraday_rows) if intraday_rows else 0.0
+            today_value = sum(r["price"] * 1000 * r["volume"] for r in intraday_rows) if intraday_rows else 0.0
 
             avg_intraday_expected = gtgd20 * expected_fraction
 
@@ -77,6 +77,7 @@ class StockRepositoryImpl(StockRepository):
                 history_sessions=history_sessions,
                 today_value=today_value,
                 avg_intraday_expected=avg_intraday_expected,
+                intraday_ratio=today_value / avg_intraday_expected if avg_intraday_expected > 0 else None,
             ))
 
         log.info("list_stocks done: %d stocks returned", len(result))

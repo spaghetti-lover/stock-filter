@@ -70,6 +70,7 @@ class DbStockRepositoryImpl(StockRepository):
                 history_sessions=row["history_sessions"] or 0,
                 today_value=float(row["today_value"]),
                 avg_intraday_expected=gtgd20 * expected_fraction,
+                intraday_ratio=float(row["today_value"]) / (gtgd20 * expected_fraction) if gtgd20 * expected_fraction > 0 else None,
             ))
 
         log.info("list_stocks (DB) done: %d stocks returned", len(result))

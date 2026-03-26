@@ -108,7 +108,7 @@ async def run_full_crawl(history_days: int = 60):
             current_price = float(history_rows[-1]["close"])
             history_sessions = len(history_rows)
             last20 = history_rows[-20:]
-            gtgd20 = sum(r["close"] * r["volume"] for r in last20) / len(last20)
+            gtgd20 = sum(r["close"] * 1000 * r["volume"] for r in last20) / len(last20)
 
             await write_stock_metrics(
                 symbol=symbol,

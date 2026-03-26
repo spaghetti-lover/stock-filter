@@ -114,7 +114,7 @@ async def write_intraday(symbol: str, snap_date: date, intraday: list[dict]):
             snap_time = dtime.fromisoformat(snap_time)
         price = float(r["price"])
         volume = int(r["volume"])
-        today_value += price * volume
+        today_value += price * 1000 * volume
         snapshot_rows.append((symbol, snap_date, snap_time, price, volume))
 
     async with pool.acquire() as conn:

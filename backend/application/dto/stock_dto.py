@@ -9,3 +9,4 @@ class GetStockResponse(BaseModel):
     history_sessions: int
     today_value: float
     avg_intraday_expected: float
+    intraday_ratio: float | None

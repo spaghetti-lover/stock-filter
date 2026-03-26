@@ -13,7 +13,8 @@ class StockMapper:
             gtgd20=stock.gtgd20,
             history_sessions=stock.history_sessions,
             today_value=stock.today_value,
-            avg_intraday_expected=stock.avg_intraday_expected
+            avg_intraday_expected=stock.avg_intraday_expected,
+            intraday_ratio=stock.intraday_ratio,
         )
 
     @staticmethod

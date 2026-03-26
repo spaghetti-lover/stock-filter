@@ -1,5 +1,5 @@
 class Stock:
-    def __init__(self, symbol: str, exchange: str, status: str, price: float, gtgd20: float, history_sessions: int, today_value: float, avg_intraday_expected: float):
+    def __init__(self, symbol: str, exchange: str, status: str, price: float, gtgd20: float, history_sessions: int, today_value: float, avg_intraday_expected: float, intraday_ratio: float | None):
         self.symbol = symbol
         self.exchange = exchange
         self.status = status
@@ -8,3 +8,4 @@ class Stock:
         self.history_sessions = history_sessions
         self.today_value = today_value
         self.avg_intraday_expected = avg_intraday_expected
+        self.intraday_ratio = intraday_ratio
