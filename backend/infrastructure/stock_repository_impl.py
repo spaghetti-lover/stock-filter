@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 from domain.entities.stock import Stock
 from domain.repositories.stock_repository import StockRepository
@@ -15,13 +15,12 @@ INTRADAY_CUMULATIVE = [0.12, 0.22, 0.30, 0.37, 0.43, 0.48, 0.56, 0.65, 0.75, 0.8
 
 
 def _get_expected_fraction_at_time(hour: int, minute: int) -> float:
+    if (hour, minute) < (9, 0):
+        return 0.0
     for i, (h, m) in enumerate(INTRADAY_TIME_SLOTS):
         if (hour, minute) <= (h, m):
             if i == 0:
-                slot_start = (9, 0)
-                elapsed = (hour * 60 + minute) - (slot_start[0] * 60 + slot_start[1])
-                slot_len = (h * 60 + m) - (slot_start[0] * 60 + slot_start[1])
-                return max(0.0, INTRADAY_CUMULATIVE[0] * (elapsed / max(slot_len, 1)))
+                return INTRADAY_CUMULATIVE[0]
             prev_h, prev_m = INTRADAY_TIME_SLOTS[i - 1]
             elapsed = (hour * 60 + minute) - (prev_h * 60 + prev_m)
             slot_len = (h * 60 + m) - (prev_h * 60 + prev_m)
@@ -32,7 +31,7 @@ def _get_expected_fraction_at_time(hour: int, minute: int) -> float:
 
 class StockRepositoryImpl(StockRepository):
     async def list_stocks(self, exchanges: set[str] | None = None, min_gtgd: float = 0.0) -> list[Stock]:
-        now = datetime.now()
+        now = datetime.now(tz=timezone(timedelta(hours=7)))
         expected_fraction = _get_expected_fraction_at_time(now.hour, now.minute)
 
         log.info("list_stocks started: exchanges=%s min_gtgd=%s fraction=%.2f", exchanges, min_gtgd, expected_fraction)
