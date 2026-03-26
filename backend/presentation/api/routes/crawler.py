@@ -7,7 +7,7 @@ router = APIRouter()
 
 
 @router.post("/crawler/start")
-async def start_crawler(background_tasks: BackgroundTasks, history_days: int = 60):
+async def start_crawler(background_tasks: BackgroundTasks, history_days: int = 90):
     state = get_state()
     if state.status == "running":
         raise HTTPException(status_code=409, detail="Crawler is already running")

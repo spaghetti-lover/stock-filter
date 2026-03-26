@@ -71,7 +71,7 @@ def get_intraday(symbol: str) -> list[dict]:
     return df.to_dict(orient="records")
 
 
-async def run_full_crawl(history_days: int = 60):
+async def run_full_crawl(history_days: int = 90):
     """Crawl all symbols and persist to DB."""
     from crawler.db_writer import write_symbols, write_trading_history, write_stock_metrics, write_intraday
     from crawler.state import get_state
