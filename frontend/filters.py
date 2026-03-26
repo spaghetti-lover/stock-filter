@@ -81,8 +81,8 @@ def _check(
     if use_history and s["history_sessions"] < min_history:
         return f"Only {s['history_sessions']} sessions of history (need {min_history})"
 
-    if use_price and s["current_price"] < min_price:
-        return f"Price {s['current_price']:,} VND < {min_price:,} VND"
+    if use_price and s["current_price"] * 1000 < min_price:
+        return f"Price {s['current_price'] * 1000:,.0f} VND < {min_price:,.0f} VND"
 
     if use_intraday and s["avg_intraday_expected"] > 0:
         ratio = s["today_value"] / s["avg_intraday_expected"]

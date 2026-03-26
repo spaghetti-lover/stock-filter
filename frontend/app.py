@@ -151,7 +151,7 @@ def build_df(stocks: list[dict], include_reason: bool = False) -> pd.DataFrame:
             "Symbol": s["symbol"],
             "Exchange": s["exchange"],
             "Status": s["status"],
-            "Price (VND)": f"{s['current_price']:,}",
+            "Price (VND)": f"{s['current_price'] * 1000:,.0f}",
             "GTGD (B)": f"{s['gtgd20']/1e9:.1f}",
             "History (sessions)": s["history_sessions"],
             "Today value (B)": f"{s['today_value']/1e9:.2f}",
