@@ -146,11 +146,7 @@ st.divider()
 def build_df(stocks: list[dict], include_reason: bool = False) -> pd.DataFrame:
     rows = []
     for s in stocks:
-        intraday_ratio = (
-            s["today_value"] / s["avg_intraday_expected"]
-            if s["avg_intraday_expected"] > 0
-            else None
-        )
+        intraday_ratio = s.get("intraday_ratio")
         row = {
             "Symbol": s["symbol"],
             "Exchange": s["exchange"],
