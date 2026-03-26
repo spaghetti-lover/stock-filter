@@ -31,7 +31,6 @@ pip install -r requirements.txt
 ```bash
 cat > .env << 'EOF'
 VNSTOCK_API_KEY=<your_vnstock_api_key>
-STOCK_THREAD_POOL_SIZE=1
 DATABASE_URL=postgresql://postgres:password@localhost:5432/stock_data
 EOF
 ```
@@ -43,6 +42,7 @@ make db_start
 ```
 
 This runs `postgres:latest` on port `5432` with:
+
 - User: `postgres`
 - Password: `password`
 - Database: `stock_data`
@@ -125,10 +125,10 @@ CD is automated via `.github/workflows/deploy.yml`. On every push to `main`, Git
 
 ### Required GitHub Secrets
 
-| Secret | Description |
-|---|---|
-| `VPS_HOST` | IP or hostname of the VPS |
-| `VPS_USER` | SSH username (e.g. `root`) |
+| Secret        | Description                            |
+| ------------- | -------------------------------------- |
+| `VPS_HOST`    | IP or hostname of the VPS              |
+| `VPS_USER`    | SSH username (e.g. `root`)             |
 | `VPS_SSH_KEY` | Private SSH key with access to the VPS |
 
 ---
@@ -167,9 +167,9 @@ journalctl -u stock-filter-frontend -f
 
 ## 6. Useful Commands
 
-| Command | Description |
-|---|---|
-| `make db_start` | Start PostgreSQL container |
-| `make db_stop` | Stop and remove PostgreSQL container |
-| `make migrate` | Run SQL migrations |
-| `make remove_pycache` | Clean up `__pycache__` directories |
+| Command               | Description                          |
+| --------------------- | ------------------------------------ |
+| `make db_start`       | Start PostgreSQL container           |
+| `make db_stop`        | Stop and remove PostgreSQL container |
+| `make migrate`        | Run SQL migrations                   |
+| `make remove_pycache` | Clean up `__pycache__` directories   |
