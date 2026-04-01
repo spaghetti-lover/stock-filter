@@ -31,7 +31,7 @@ class _RateLimiter:
             self._timestamps.append(time.monotonic())
 
 
-_limiter = _RateLimiter(calls_per_minute=55)
+_limiter = _RateLimiter(calls_per_minute=200)
 
 
 def get_all_symbols() -> list[dict]:
