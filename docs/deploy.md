@@ -30,7 +30,6 @@ pip install -r requirements.txt
 
 ```bash
 cat > .env << 'EOF'
-VNSTOCK_API_KEY=<your_vnstock_api_key>
 DATABASE_URL=postgresql://postgres:password@localhost:5432/stock_data
 EOF
 ```

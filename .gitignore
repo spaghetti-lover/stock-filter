@@ -5,3 +5,4 @@ backend/errors.log
 __pycache__/
 *.pyc
 *.pyo
+.claude

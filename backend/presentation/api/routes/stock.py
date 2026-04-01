@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from application.use_case.get_stock import GetStockUseCase
 from application.dto.stock_dto import GetStockResponse
-from infrastructure.db_stock_repository_impl import DbStockRepositoryImpl
+from infrastructure.stock_repository_impl import StockRepositoryImpl
 from logger import get_logger
 
 log = get_logger(__name__)
@@ -9,7 +9,7 @@ router = APIRouter()
 
 
 def get_usecase() -> GetStockUseCase:
-    return GetStockUseCase(DbStockRepositoryImpl())
+    return GetStockUseCase(StockRepositoryImpl())
 
 
 @router.get("/stocks", response_model=list[GetStockResponse])

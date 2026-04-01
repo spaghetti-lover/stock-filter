@@ -1,16 +1,11 @@
-import os
 import time
 import threading
 from collections import deque
 from datetime import datetime, timedelta, date
-from vnstock import Vnstock, change_api_key
+from vnstock_data import Reference, Market
 from logger import get_logger
 
 log = get_logger(__name__)
-
-_api_key = os.environ.get("VNSTOCK_API_KEY", "")
-if _api_key:
-    change_api_key(_api_key)
 
 
 class _RateLimiter:
@@ -43,8 +38,7 @@ def get_all_symbols() -> list[dict]:
     """Get all stock symbols from HOSE and HNX exchanges."""
     log.debug("Fetching all symbols")
     _limiter.acquire()
-    stock = Vnstock().stock(symbol="VN30F1M", source="VCI")
-    df = stock.listing.symbols_by_exchange()
+    df = Reference().equity.list_by_exchange()
     df = df[df["exchange"].isin(["HOSE", "HNX"])]
     symbols = df[["symbol", "exchange"]].to_dict(orient="records")
     log.info("Fetched %d symbols", len(symbols))
@@ -55,10 +49,13 @@ def get_trading_history(symbol: str, days: int = 100) -> list[dict]:
     """Get daily OHLCV history for a symbol."""
     log.debug("Fetching trading history: symbol=%s days=%d", symbol, days)
     _limiter.acquire()
-    stock = Vnstock().stock(symbol=symbol, source="VCI")
     end = datetime.now().strftime("%Y-%m-%d")
     start = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
-    df = stock.quote.history(start=start, end=end)
+    try:
+        df = Market().equity(symbol).ohlcv(start=start, end=end)
+    except ValueError:
+        log.debug("No trading history for %s", symbol)
+        return []
     return df.to_dict(orient="records")
 
 
@@ -66,9 +63,14 @@ def get_intraday(symbol: str) -> list[dict]:
     """Get intraday snapshots for a symbol."""
     log.debug("Fetching intraday: symbol=%s", symbol)
     _limiter.acquire()
-    stock = Vnstock().stock(symbol=symbol, source="VCI")
-    df = stock.quote.intraday()
-    return df.to_dict(orient="records")
+    try:
+        df = Market().equity(symbol).intraday()
+    except ValueError:
+        log.debug("No intraday data for %s", symbol)
+        return []
+    # vnstock_data returns time as datetime; db_writer expects a time object
+    df["time"] = df["time"].dt.time
+    return df[["time", "price", "volume"]].to_dict(orient="records")
 
 
 async def run_full_crawl(history_days: int = 90):
