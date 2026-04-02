@@ -1,6 +1,8 @@
+import asyncio
 import time
 import threading
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, date
 from vnstock_data import Reference, Market
 from logger import get_logger
@@ -31,7 +33,8 @@ class _RateLimiter:
             self._timestamps.append(time.monotonic())
 
 
-_limiter = _RateLimiter(calls_per_minute=200)
+_limiter = _RateLimiter(calls_per_minute=500)
+_executor = ThreadPoolExecutor(max_workers=10)
 
 
 def get_all_symbols() -> list[dict]:
@@ -74,7 +77,7 @@ def get_intraday(symbol: str) -> list[dict]:
 
 
 async def run_full_crawl(history_days: int = 90):
-    """Crawl all symbols and persist to DB."""
+    """Crawl all symbols concurrently and persist to DB."""
     from crawler.db_writer import write_symbols, write_trading_history, write_stock_metrics, write_intraday
     from crawler.state import get_state
 
@@ -86,52 +89,69 @@ async def run_full_crawl(history_days: int = 90):
     state.total = 0
     state.current_symbol = ""
     state.error = ""
+    state.failed_symbols = []
     today = date.today()
+
+    semaphore = asyncio.Semaphore(10)
+    loop = asyncio.get_running_loop()
+
+    async def process_symbol(item: dict, index: int):
+        async with semaphore:
+            symbol = item["symbol"]
+            state.current_symbol = symbol
+            log.info("[%d/%d] Crawling %s", index + 1, state.total, symbol)
+
+            try:
+                history_rows = await loop.run_in_executor(
+                    _executor, get_trading_history, symbol, history_days
+                )
+                if not history_rows:
+                    log.warning("No history for %s, skipping", symbol)
+                    return
+
+                await write_trading_history(symbol, history_rows)
+
+                current_price = float(history_rows[-1]["close"])
+                history_sessions = len(history_rows)
+                last20 = history_rows[-20:]
+                gtgd20 = sum(r["close"] * 1000 * r["volume"] for r in last20) / len(last20)
+
+                await write_stock_metrics(
+                    symbol=symbol,
+                    current_price=current_price,
+                    gtgd20=gtgd20,
+                    history_sessions=history_sessions,
+                    metrics_date=today,
+                )
+
+                try:
+                    intraday_rows = await loop.run_in_executor(
+                        _executor, get_intraday, symbol
+                    )
+                    if intraday_rows:
+                        await write_intraday(symbol, today, intraday_rows)
+                except Exception as e:
+                    log.warning("Skipping intraday for %s: %s", symbol, e)
+
+            except Exception as e:
+                log.error("Failed to process %s: %s", symbol, e, exc_info=True)
+                state.add_failed_symbol(symbol)
+            finally:
+                state.increment_processed()
 
     try:
         symbols = get_all_symbols()
         await write_symbols(symbols)
         state.total = len(symbols)
-        log.info("run_full_crawl: processing %d symbols", state.total)
+        log.info("run_full_crawl: processing %d symbols concurrently", state.total)
 
-        for i, item in enumerate(symbols):
-            symbol = item["symbol"]
-            state.current_symbol = symbol
-            log.info("[%d/%d] Crawling %s", i + 1, state.total, symbol)
-
-            history_rows = get_trading_history(symbol, days=history_days)
-            if not history_rows:
-                log.warning("No history for %s, skipping", symbol)
-                state.processed += 1
-                continue
-
-            await write_trading_history(symbol, history_rows)
-
-            current_price = float(history_rows[-1]["close"])
-            history_sessions = len(history_rows)
-            last20 = history_rows[-20:]
-            gtgd20 = sum(r["close"] * 1000 * r["volume"] for r in last20) / len(last20)
-
-            await write_stock_metrics(
-                symbol=symbol,
-                current_price=current_price,
-                gtgd20=gtgd20,
-                history_sessions=history_sessions,
-                metrics_date=today,
-            )
-
-            try:
-                intraday_rows = get_intraday(symbol)
-                if intraday_rows:
-                    await write_intraday(symbol, today, intraday_rows)
-            except Exception as e:
-                log.warning("Skipping intraday for %s: %s", symbol, e)
-
-            state.processed += 1
+        await asyncio.gather(*[
+            process_symbol(item, i) for i, item in enumerate(symbols)
+        ])
 
         state.status = "done"
         state.current_symbol = ""
-        log.info("run_full_crawl: done")
+        log.info("run_full_crawl: done (%d failed)", len(state.failed_symbols))
     except Exception as e:
         state.status = "error"
         state.error = str(e)

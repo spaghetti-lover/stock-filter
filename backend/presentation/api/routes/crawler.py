@@ -29,4 +29,5 @@ async def crawler_status():
         "processed": state.processed,
         "current_symbol": state.current_symbol,
         "error": state.error,
+        "failed_count": len(state.failed_symbols),
     }
