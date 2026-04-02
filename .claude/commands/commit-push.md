@@ -19,5 +19,10 @@ Rules:
 
 - Commit only what is already staged (`git diff --cached`)
 - Do NOT add `Co-Authored-By` or any trailer lines
-- Use a concise, descriptive commit message following the style of recent commits
+- Follow Conventional Commits format: `<type>(<scope>): <description>`
+  - Types: `feat`, `fix`, `refactor`, `docs`, `style`, `test`, `chore`, `perf`, `ci`, `build`
+  - Scope is optional, use the main area affected (e.g. `crawler`, `api`, `frontend`)
+  - Description: lowercase, imperative mood, no period at end
+  - Example: `feat(crawler): add concurrent symbol processing`
+  - For multi-line bodies, add a blank line after the subject, then bullet points
 - Pass the commit message via heredoc to avoid shell escaping issues
