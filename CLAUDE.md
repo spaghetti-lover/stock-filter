@@ -7,7 +7,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Vietnam Stock Filter — a web app that filters Vietnamese stocks (HOSE/HNX/UPCOM) using trading metrics. Fetches data via the vnstock API, stores it in PostgreSQL, exposes a FastAPI backend, and provides a Streamlit frontend.
 
 ## Commands
-
+You must install new package with in virtual environment
+Use
 ```bash
 # Python: always run with -B to avoid bytecode
 python -B main.py
@@ -20,6 +21,8 @@ make remove_pycache # Clean __pycache__ directories
 
 # Backend (from repo root)
 cd backend && uvicorn main:app --reload   # http://localhost:8000, docs at /docs
+# if get error missing package with mise just use
+mise deactivate
 
 # Frontend (from repo root)
 cd frontend && streamlit run app.py      # http://localhost:8501
