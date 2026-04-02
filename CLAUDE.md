@@ -7,8 +7,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Vietnam Stock Filter — a web app that filters Vietnamese stocks (HOSE/HNX/UPCOM) using trading metrics. Fetches data via the vnstock API, stores it in PostgreSQL, exposes a FastAPI backend, and provides a Streamlit frontend.
 
 ## Commands
+
 You must install new package with in virtual environment
-Use
+
 ```bash
 # Python: always run with -B to avoid bytecode
 python -B main.py
@@ -55,6 +56,7 @@ Frontend (`frontend/`) is a Streamlit app; filtering is split between SQL (excha
 ## Environment
 
 Requires `.env` with:
+
 ```
 DATABASE_URL=postgresql://postgres:password@localhost:5432/stock_data
 ```
@@ -66,17 +68,18 @@ DATABASE_URL=postgresql://postgres:password@localhost:5432/stock_data
 This project uses `vnstock_data` 3.0.0 (Unified UI), **not** the free `vnstock` library.
 
 ### Import
+
 ```python
 from vnstock_data import Reference, Market
 ```
 
 ### API map for this project
 
-| Purpose | Call |
-|---|---|
+| Purpose                 | Call                                                                             |
+| ----------------------- | -------------------------------------------------------------------------------- |
 | List symbols (HOSE/HNX) | `Reference().equity.list_by_exchange()` → filter `exchange` in `["HOSE", "HNX"]` |
-| Daily OHLCV history | `Market().equity(symbol).ohlcv(start="YYYY-MM-DD", end="YYYY-MM-DD")` |
-| Intraday ticks | `Market().equity(symbol).intraday()` |
+| Daily OHLCV history     | `Market().equity(symbol).ohlcv(start="YYYY-MM-DD", end="YYYY-MM-DD")`            |
+| Intraday ticks          | `Market().equity(symbol).intraday()`                                             |
 
 ### Column shapes
 
@@ -87,7 +90,9 @@ from vnstock_data import Reference, Market
 **`intraday()`** → `time` (datetime), `price`, `volume`, `match_type`, `id`
 
 ### Intraday datetime quirk
+
 `intraday()` returns `time` as a full `datetime`, but `db_writer.write_intraday` expects a `time` object for `snap_time`. Convert before passing:
+
 ```python
 df["time"] = df["time"].dt.time
 ```
@@ -100,14 +105,14 @@ This repository provides complete documentation for the **vnstock ecosystem** �
 
 #### Core Libraries
 
-| Library              | Purpose                                    | Users           | Status        |
-| -------------------- | ------------------------------------------ | --------------- | ------------- |
-| **vnstock**          | Free stock data API                        | Free users      | ✅ Production |
-| **vnstock_data**     | High quality data with advanced features   | Sponsored users | ✅ Production |
-| **vnstock_ta**       | Technical analysis indicators              | Sponsored users | ✅ Production |
-| **vnstock_news**     | News crawling and sentiment analysis       | Sponsored users | ✅ Production |
-| **vnstock_pipeline** | Data pipeline and streaming                | Sponsored users | ✅ Production |
-
+| Library              | Purpose                                  | Users           | Status        |
+| -------------------- | ---------------------------------------- | --------------- | ------------- |
+| **vnstock**          | Free stock data API                      | Free users      | ✅ Production |
+| **vnstock_data**     | High quality data with advanced features | Sponsored users | ✅ Production |
+| **vnstock_ta**       | Technical analysis indicators            | Sponsored users | ✅ Production |
+| **vnstock_news**     | News crawling and sentiment analysis     | Sponsored users | ✅ Production |
+| **vnstock_pipeline** | Data pipeline and streaming              | Sponsored users | ✅ Production |
+e
 ### 🎯 Your Role as AI Agent
 
 You are a coding assistant helping users build Python applications using vnstock libraries. Your responsibilities:
@@ -130,6 +135,7 @@ You are a coding assistant helping users build Python applications using vnstock
 ### 📚 Installation Guide
 
 #### Stable Version (Recommended for Production)
+
 For most users who need a stable, reliable version:
 
 ```bash
@@ -137,6 +143,7 @@ pip install -U vnstock
 ```
 
 #### Beta/Development Version (Latest Features)
+
 For users who want the latest features (may be unstable):
 
 ```bash
@@ -152,6 +159,7 @@ pip install git+https://github.com/thinh-vu/vnstock
 The repository contains multiple documentation folders covering different parts of the ecosystem. To save context tokens and ensure you have the most up-to-date information, **do not assume the exact file structure**.
 
 **AI Instruction:** Use your directory listing tools (e.g., `list_dir`) to explore the `docs/` and `vnstock*/` directories to find the relevant markdown files. Key locations include:
+
 - `docs/setup-and-debug/`: Environment health check, installation troubleshooting, and AI vibe coding workflow.
 - `docs/vnstock/`: Free library documentation (listing, company, trading, finance).
 - `docs/vnstock-data/`: Sponsored library documentation, featuring the Unified UI (`14-unified-ui.md` & `unified-ui/` directory).
@@ -166,20 +174,26 @@ The repository contains multiple documentation folders covering different parts 
 Proper environment management is critical for the Vnstock ecosystem. **Always verify the user's environment before installation.**
 
 ### Global vs. Virtual Environments
+
 - **Free Libraries** (`vnstock`, `vnstock_ezchart`): Can be installed globally or in a virtual environment (`.venv`).
 - **Sponsored Libraries** (`vnstock_data`, `vnstock_ta`, `vnstock_news`): **STRONGLY PREFER** installation in a virtual environment located at `~/.venv` (the Home directory) to share credentials across projects.
 
 ### 🚀 Sponsored-First Prioritization
+
 **AI Instruction:** Before suggesting any code or documentation, check if `vnstock_data` is installed in the standard `~/.venv` directory. If detected, you **MUST** prioritize `vnstock_data` (Sponsored) over `vnstock` (Free) in all recommendations. Focus on the Unified UI and Sponsored-only features.
 
 ### AI Environment Search Priority
+
 When looking for installed libraries or Python executables, search in this order:
+
 1. **Home Virtual Environment**: `~/.venv`
 2. **Project Virtual Environment**: `./.venv`, `~/venv` or `~/env` (current project directory)
 3. **Global Environment**: System Python
 
 ### Virtual Environment Activation
+
 Before running scripts or interacting with the sponsored ecosystem, activate the virtual environment:
+
 - **macOS/Linux**: `source ~/.venv/bin/activate` (or `source .venv/bin/activate` for project-specific)
 - **Windows**: `~/.venv\Scripts\activate` (or `.venv\Scripts\activate` for project-specific)
 
@@ -224,12 +238,14 @@ If the user asks you to "install the agent guide" or "setup the workspace", foll
 **User Request**: "I want to get historical stock prices for VCB"
 
 **Your Approach**:
+
 1. Determine user tier (free or sponsored)
 2. If **free**: Use `vnstock.Quote` → Reference `docs/vnstock/06-quote-price-api.md`
 3. If **sponsored**: Use `vnstock_data.Quote` → Reference `docs/vnstock-data/03-quote.md`
 4. Provide basic code example
 
 **Example Code (Free User)**:
+
 ```python
 from vnstock import Quote
 
@@ -247,6 +263,7 @@ print(df.head())
 ```
 
 **Example Code (Sponsored User - Unified UI)**:
+
 ```python
 from vnstock_data import Market, show_api, show_doc
 
@@ -270,11 +287,13 @@ print(df.head())
 **User Request**: "Show me financial data for VCB"
 
 **Your Approach**:
+
 1. Recommend **vnstock_data** for better financial data (if sponsored)
 2. Reference `docs/vnstock-data/05-finance.md` or `docs/vnstock/07-financial-api.md`
 3. Provide basic analysis script
 
 **Example Code (Unified UI)**:
+
 ```python
 from vnstock_data import Fundamental, Market
 
@@ -297,12 +316,14 @@ print(ratios.tail(1))
 **User Request**: "Find all stocks in VN30 that are undervalued"
 
 **Your Approach**:
+
 1. This requires **vnstock_data** (sponsored feature)
 2. Reference `docs/vnstock-data/08-insights.md` for screener
 3. Reference `docs/vnstock-data/02-listing.md` for stock lists
 4. Build screening logic with clear criteria
 
 **Example Code**:
+
 ```python
 from vnstock_data import Listing, Finance
 
@@ -327,12 +348,14 @@ print(f"VCB financial ratios:\n{ratios.tail(1)}")
 **User Request**: "Calculate moving averages and RSI"
 
 **Your Approach**:
+
 1. Use **vnstock_ta** for technical indicators
 2. Reference `docs/vnstock_ta/02-indicators.md`
 3. Combine with Quote data from vnstock or vnstock_data
 4. Provide visualization example
 
 **Example Code**:
+
 ```python
 from vnstock import Quote
 from vnstock_ta import Indicators
@@ -353,6 +376,7 @@ print(df[['time', 'close', 'sma_20', 'rsi']].tail(20))
 ---
 
 ### Use Case 5: Unified UI & Versioning
+
 - **vnstock_data >= 3.0.0**: MUST use Unified UI (`Market`, `Fundamental`, `Reference`, etc.) and API discovery (`show_api`, `show_doc`).
 - **Robust Version Check**: Since older versions may not have `__version__`, use this snippet:
 
@@ -395,6 +419,7 @@ show_doc("Market.equity")
 ## 🛠️ Quick Reference
 
 ### Task: Get Stock List
+
 ```
 Free: vnstock.Listing.all_symbols()
 Sponsored: vnstock_data.Listing.all_symbols()
@@ -402,6 +427,7 @@ Reference: docs/vnstock/03-listing-api.md
 ```
 
 ### Task: Get Company Info
+
 ```
 Free: vnstock.Company.overview()
 Sponsored: vnstock_data.Company.overview()
@@ -409,6 +435,7 @@ Reference: docs/vnstock/04-company-api.md
 ```
 
 ### Task: Get Financial Statements
+
 ```
 Free: vnstock.Finance.income_statement()
 Sponsored: vnstock_data.Finance.income_statement()
@@ -416,6 +443,7 @@ Reference: docs/vnstock/07-financial-api.md
 ```
 
 ### Task: Calculate Technical Indicators
+
 ```
 Sponsored: vnstock_ta.Indicators
 Reference: docs/vnstock_ta/02-indicators.md
@@ -455,6 +483,7 @@ Reference: docs/vnstock_ta/02-indicators.md
 If `vnstock_data` is detected in `~/.venv`, prioritize the **Sponsored Path**. Otherwise, follow the **Free Path**.
 
 ### 🌟 Sponsored Path (Prioritized if vnstock_data is present)
+
 1. **Start Here**: `docs/vnstock-data/01-overview.md` - Features & Data Sources
 2. **Unified UI**: `docs/vnstock-data/14-unified-ui.md` - Mastering Layer 1-7
 3. **Market Data**: `docs/vnstock-data/unified-ui/02-market-layer.md` - Comprehensive OHLCV
@@ -463,6 +492,7 @@ If `vnstock_data` is detected in `~/.venv`, prioritize the **Sponsored Path**. O
 6. **Automation**: `docs/vnstock_pipeline/01-overview.md` - Data Pipelines
 
 ### 🍃 Free Path
+
 1. **Start Here**: `docs/vnstock/01-overview.md` - Understand the ecosystem
 2. **Installation**: `docs/vnstock/02-installation.md` - Set up environment
 3. **First API**: `docs/vnstock/03-listing-api.md` - Get list of stocks
