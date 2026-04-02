@@ -53,7 +53,7 @@ with st.sidebar:
         max_value=500,
         value=60,
         step=5,
-        help="Stock must have at least this many trading sessions of historical data.",
+        help="Trading sessions only (excludes weekends & holidays). The lookup window is calendar days, so holidays reduce the actual session count.",
         disabled=not use_history,
         label_visibility="collapsed",
     )
