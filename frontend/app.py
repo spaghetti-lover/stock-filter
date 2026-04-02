@@ -5,14 +5,6 @@ import pandas as pd
 import requests
 from datetime import datetime
 
-from filters import (
-    apply_filters,
-    MIN_HISTORY_SESSIONS,
-    MIN_PRICE,
-    MIN_INTRADAY_RATIO,
-    MIN_VOLUME,
-)
-
 st.set_page_config(page_title="Vietnam Stock Filter", page_icon="📈", layout="wide")
 
 st.title("📈 Vietnam Stock Filter")
@@ -59,7 +51,7 @@ with st.sidebar:
         "Min history (sessions)",
         min_value=1,
         max_value=500,
-        value=MIN_HISTORY_SESSIONS,
+        value=60,
         step=5,
         help="Stock must have at least this many trading sessions of historical data.",
         disabled=not use_history,
@@ -71,7 +63,7 @@ with st.sidebar:
         "Min price (VND)",
         min_value=100,
         max_value=1_000_000,
-        value=int(MIN_PRICE),
+        value=5_000,
         step=500,
         help="Current price must be >= this value.",
         disabled=not use_price,
@@ -83,7 +75,7 @@ with st.sidebar:
         "Min volume (million VND)",
         min_value=0.0,
         max_value=10_000.0,
-        value=MIN_VOLUME / 1e6,
+        value=5.0,
         step=1.0,
         help="Today's trading volume (value) must be >= this amount.",
         disabled=not use_volume,
@@ -95,7 +87,7 @@ with st.sidebar:
         "Min intraday activity (%)",
         min_value=0,
         max_value=100,
-        value=int(MIN_INTRADAY_RATIO * 100),
+        value=30,
         step=5,
         help=(
             "Today's trading value up to now must be >= X% of the expected value "
@@ -114,29 +106,31 @@ if not run:
     st.stop()
 
 with st.spinner("Fetching data from API…"):
-    raw_stocks = requests.get("http://localhost:8000/stocks").json()
+    params = {
+        "exchanges": exchanges,
+        "min_gtgd": min_gtgd20,
+        "statuses": allowed_statuses_labels if allowed_statuses_labels else None,
+        "min_history": min_history,
+        "min_price": min_price,
+        "min_intraday_ratio": min_intraday_pct / 100,
+        "min_volume": min_volume_m * 1e6,
+        "use_exchange": use_exchange,
+        "use_gtgd20": use_gtgd20,
+        "use_status": use_status,
+        "use_history": use_history,
+        "use_price": use_price,
+        "use_intraday": use_intraday,
+        "use_volume": use_volume,
+    }
+    resp = requests.get("http://localhost:8000/stocks", params=params)
+    data = resp.json()
 
-passed, rejected = apply_filters(
-    raw_stocks,
-    exchanges=set(exchanges),
-    min_gtgd20=min_gtgd20 * 1e9,
-    allowed_statuses=set(allowed_statuses_labels),
-    min_history=min_history,
-    min_price=min_price,
-    min_intraday_ratio=min_intraday_pct / 100,
-    min_volume=min_volume_m * 1e6,
-    use_exchange=use_exchange,
-    use_gtgd20=use_gtgd20,
-    use_status=use_status,
-    use_history=use_history,
-    use_price=use_price,
-    use_intraday=use_intraday,
-    use_volume=use_volume,
-)
+passed = data["passed"]
+rejected = data["rejected"]
 
 # ── Summary metrics ───────────────────────────────────────────────────────────
 col1, col2, col3 = st.columns(3)
-col1.metric("Total stocks scanned", len(raw_stocks))
+col1.metric("Total stocks scanned", len(passed) + len(rejected))
 col2.metric("✅ Passed", len(passed))
 col3.metric("❌ Filtered out", len(rejected))
 

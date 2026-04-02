@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 
+
 class GetStockResponse(BaseModel):
     symbol: str
     exchange: str
@@ -10,3 +11,9 @@ class GetStockResponse(BaseModel):
     today_value: float
     avg_intraday_expected: float
     intraday_ratio: float | None
+    reject_reason: str | None = None
+
+
+class FilteredStocksResponse(BaseModel):
+    passed: list[GetStockResponse]
+    rejected: list[GetStockResponse]
