@@ -1,3 +1,5 @@
+.PHONY: remove_pycache db_start db_stop migrate frontend backend
+
 remove_pycache:
 	find . -type d -name "__pycache__" -exec rm -r {} +
 
@@ -15,3 +17,9 @@ db_stop:
 
 migrate:
 	psql "postgresql://postgres:password@localhost:5432/stock_data" -f backend/db/migrations/001_create_stocks.sql
+
+frontend:
+	cd frontend && streamlit run app.py --server.headless true
+
+backend:
+	cd backend && uvicorn main:app --reload

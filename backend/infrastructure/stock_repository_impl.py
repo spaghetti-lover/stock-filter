@@ -10,6 +10,14 @@ from logger import get_logger
 log = get_logger(__name__)
 
 _executor = ThreadPoolExecutor(max_workers=20)
+_semaphore: asyncio.Semaphore | None = None
+
+
+def _get_semaphore() -> asyncio.Semaphore:
+    global _semaphore
+    if _semaphore is None:
+        _semaphore = asyncio.Semaphore(20)
+    return _semaphore
 
 INTRADAY_TIME_SLOTS = [
     (9, 0), (9, 30), (10, 0), (10, 30), (11, 0), (11, 30),
@@ -46,39 +54,44 @@ class StockRepositoryImpl(StockRepository):
             symbols = [s for s in symbols if s["exchange"] in exchanges]
         log.info("Processing %d symbols", len(symbols))
 
+        sem = _get_semaphore()
+
         async def process(item: dict) -> Stock | None:
-            symbol = item["symbol"]
-            exchange = item["exchange"]
+            async with sem:
+                symbol = item["symbol"]
+                exchange = item["exchange"]
 
-            history_rows = await loop.run_in_executor(_executor, get_trading_history, symbol, 60)
-            if not history_rows:
-                log.debug("No history for %s, skipping", symbol)
-                return None
+                history_fut = loop.run_in_executor(_executor, get_trading_history, symbol, 60)
+                intraday_fut = loop.run_in_executor(_executor, get_intraday, symbol)
+                history_rows, intraday_rows = await asyncio.gather(history_fut, intraday_fut)
 
-            current_price = history_rows[-1]["close"]
-            history_sessions = len(history_rows)
-            last20_values = [r["close"] * 1000 * r["volume"] for r in history_rows[-20:]]
-            gtgd20 = sum(last20_values) / len(last20_values)
+                if not history_rows:
+                    log.debug("No history for %s, skipping", symbol)
+                    return None
 
-            if gtgd20 < min_gtgd:
-                log.debug("Skipping %s: gtgd20=%.2f < min_gtgd=%.2f", symbol, gtgd20, min_gtgd)
-                return None
+                current_price = history_rows[-1]["close"]
+                history_sessions = len(history_rows)
+                last20_values = [r["close"] * 1000 * r["volume"] for r in history_rows[-20:]]
+                gtgd20 = sum(last20_values) / len(last20_values)
 
-            intraday_rows = await loop.run_in_executor(_executor, get_intraday, symbol)
-            today_value = sum(r["price"] * 1000 * r["volume"] for r in intraday_rows) if intraday_rows else 0.0
-            avg_intraday_expected = gtgd20 * expected_fraction
+                if gtgd20 < min_gtgd:
+                    log.debug("Skipping %s: gtgd20=%.2f < min_gtgd=%.2f", symbol, gtgd20, min_gtgd)
+                    return None
 
-            return Stock(
-                symbol=symbol,
-                exchange=exchange,
-                status="normal",
-                price=current_price,
-                gtgd20=gtgd20,
-                history_sessions=history_sessions,
-                today_value=today_value,
-                avg_intraday_expected=avg_intraday_expected,
-                intraday_ratio=today_value / avg_intraday_expected if avg_intraday_expected > 0 else None,
-            )
+                today_value = sum(r["price"] * 1000 * r["volume"] for r in intraday_rows) if intraday_rows else 0.0
+                avg_intraday_expected = gtgd20 * expected_fraction
+
+                return Stock(
+                    symbol=symbol,
+                    exchange=exchange,
+                    status="normal",
+                    price=current_price,
+                    gtgd20=gtgd20,
+                    history_sessions=history_sessions,
+                    today_value=today_value,
+                    avg_intraday_expected=avg_intraday_expected,
+                    intraday_ratio=today_value / avg_intraday_expected if avg_intraday_expected > 0 else None,
+                )
 
         results = await asyncio.gather(*[process(item) for item in symbols])
         result = [r for r in results if r is not None]

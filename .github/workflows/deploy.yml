@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: SSH Deploy
+      - name: Build and deploy on VPS
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -19,6 +19,5 @@ jobs:
             set -e
             cd /root/stock-filter
             git pull origin main
-            .venv/bin/pip install -r requirements.txt
-            make migrate
-            sudo systemctl restart stock-filter-backend stock-filter-frontend
+            docker compose build
+            docker compose up -d
