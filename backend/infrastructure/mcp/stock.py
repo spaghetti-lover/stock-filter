@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from mcp.server.fastmcp import FastMCP
-from crawler.crawler import get_all_symbols, get_trading_history, get_intraday, run_full_crawl
+from infrastructure.market_data.provider import get_all_symbols, get_trading_history, get_intraday, run_full_crawl
 
 mcp = FastMCP("stock-crawler")
 

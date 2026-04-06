@@ -78,8 +78,8 @@ def get_intraday(symbol: str) -> list[dict]:
 
 async def run_full_crawl(history_days: int = 90):
     """Crawl all symbols concurrently and persist to DB."""
-    from crawler.db_writer import write_symbols, write_trading_history, write_stock_metrics, write_intraday
-    from crawler.state import get_state
+    from infrastructure.market_data.writer import write_symbols, write_trading_history, write_stock_metrics, write_intraday
+    from infrastructure.market_data.state import get_state
 
     state = get_state()
     state.status = "running"

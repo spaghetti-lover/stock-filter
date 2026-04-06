@@ -1,5 +1,5 @@
 from fastapi import APIRouter, BackgroundTasks, HTTPException
-from crawler.state import get_state
+from infrastructure.market_data.state import get_state
 from logger import get_logger
 
 log = get_logger(__name__)
@@ -12,7 +12,7 @@ async def start_crawler(background_tasks: BackgroundTasks, history_days: int = 9
     if state.status == "running":
         raise HTTPException(status_code=409, detail="Crawler is already running")
 
-    from crawler.crawler import run_full_crawl
+    from infrastructure.market_data.provider import run_full_crawl
     background_tasks.add_task(run_full_crawl, history_days)
     log.info("Crawler started via API")
     return {"message": "Crawler started"}
