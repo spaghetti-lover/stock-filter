@@ -3,6 +3,7 @@
 from claude_agent_sdk import query, ClaudeAgentOptions, ResultMessage
 
 from domain.agents.agent_provider import AgentProvider
+from infrastructure.agents.stock_tools import create_stock_mcp_server, TOOL_NAMES
 
 
 def _format_history(messages: list[dict]) -> str:
@@ -15,8 +16,9 @@ def _format_history(messages: list[dict]) -> str:
 
 
 class ClaudeAgent(AgentProvider):
-    def __init__(self, model: str = "claude-opus-4-6"):
+    def __init__(self, model: str = "claude-sonnet-4-6"):
         self._model = model
+        self._mcp_server = create_stock_mcp_server()
 
     async def chat(self, messages: list[dict], system_prompt: str) -> str:
         # Agent SDK takes a single prompt; reconstruct context from history
@@ -31,9 +33,13 @@ class ClaudeAgent(AgentProvider):
             options=ClaudeAgentOptions(
                 model=self._model,
                 system_prompt=system_prompt,
+                mcp_servers={"stock-data": self._mcp_server},
+                allowed_tools=TOOL_NAMES,
             ),
         ):
             if isinstance(message, ResultMessage):
+                if message.is_error:
+                    return f"Error: {message.result or 'unknown error'}"
                 return message.result or ""
 
         return ""
