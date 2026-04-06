@@ -1,23 +1,16 @@
 from fastapi import APIRouter
-from pydantic import BaseModel
+
+from application.dto.chat_dto import ChatRequest, ChatResponse
+from application.use_case.chat_use_case import ChatUseCase
+from infrastructure.agents.factory import get_agent_provider
 
 router = APIRouter()
 
 
-class ChatMessage(BaseModel):
-    role: str
-    content: str
-
-
-class ChatRequest(BaseModel):
-    messages: list[ChatMessage]
-    stocks_context: list[dict] | None = None
-
-
-class ChatResponse(BaseModel):
-    response: str
+def _get_use_case() -> ChatUseCase:
+    return ChatUseCase(get_agent_provider())
 
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
-    return ChatResponse(response="This is a test response from the chatbot.")
+async def chat(request: ChatRequest) -> ChatResponse:
+    return await _get_use_case().execute(request)

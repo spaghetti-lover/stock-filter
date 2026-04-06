@@ -146,6 +146,9 @@ with tab_filter:
                 "use_volume": use_volume,
             }
             resp = requests.get("http://localhost:8000/stocks", params=params)
+            if not resp.ok:
+                st.error(f"API error {resp.status_code}: {resp.text}")
+                st.stop()
             data = resp.json()
 
         passed = data["passed"]
@@ -191,7 +194,15 @@ with tab_chat:
         }
         with st.spinner("Thinking…"):
             resp = requests.post("http://localhost:8000/chat", json=payload)
-            answer = resp.json()["response"]
 
+        if not resp.ok:
+            try:
+                detail = resp.json().get("detail", resp.text)
+            except Exception:
+                detail = resp.text
+            st.error(f"**{resp.status_code}** — {detail}")
+            st.stop()
+
+        answer = resp.json()["response"]
         st.session_state.chat_messages.append({"role": "assistant", "content": answer})
         st.rerun()
