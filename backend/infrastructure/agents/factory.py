@@ -1,15 +1,13 @@
-"""Factory that resolves AgentProvider from the LLM_PROVIDER environment variable.
+"""Factory that resolves AgentProvider from the given provider name.
 
-Set LLM_PROVIDER to one of: claude (default), openai, gemini
+provider must be one of: claude (default), openai, gemini
 """
-
-import os
 
 from domain.agents.agent_provider import AgentProvider
 
 
-def get_agent_provider() -> AgentProvider:
-    provider = os.getenv("LLM_PROVIDER", "claude").lower()
+def get_agent_provider(provider: str = "claude") -> AgentProvider:
+    provider = provider.lower()
 
     if provider == "openai":
         from infrastructure.agents.openai_agent import OpenAIAgent

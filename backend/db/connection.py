@@ -1,8 +1,11 @@
 import os
+from dotenv import load_dotenv
 
 import asyncpg
 
 from logger import get_logger
+
+load_dotenv()
 
 log = get_logger(__name__)
 
