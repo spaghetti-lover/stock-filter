@@ -10,6 +10,8 @@ st.set_page_config(page_title="Vietnam Stock Filter", page_icon="📈", layout="
 st.title("📈 Vietnam Stock Filter")
 st.caption(f"Data as of: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} (simulated)")
 
+tab_filter, tab_chat = st.tabs(["Stock Filter", "Stock Assistant"])
+
 # ── Sidebar: filter options ───────────────────────────────────────────────────
 with st.sidebar:
     st.header("Filter Options")
@@ -100,43 +102,6 @@ with st.sidebar:
     st.divider()
     run = st.button("🔍 Filter Stocks", type="primary", use_container_width=True)
 
-# ── Main area ─────────────────────────────────────────────────────────────────
-if not run:
-    st.info("Configure filters in the sidebar and click **Filter Stocks** to run.")
-    st.stop()
-
-with st.spinner("Fetching data from API…"):
-    params = {
-        "exchanges": exchanges,
-        "min_gtgd": min_gtgd20,
-        "statuses": allowed_statuses_labels if allowed_statuses_labels else None,
-        "min_history": min_history,
-        "min_price": min_price,
-        "min_intraday_ratio": min_intraday_pct / 100,
-        "min_volume": min_volume_m * 1e6,
-        "use_exchange": use_exchange,
-        "use_gtgd20": use_gtgd20,
-        "use_status": use_status,
-        "use_history": use_history,
-        "use_price": use_price,
-        "use_intraday": use_intraday,
-        "use_volume": use_volume,
-    }
-    resp = requests.get("http://localhost:8000/stocks", params=params)
-    data = resp.json()
-
-passed = data["passed"]
-rejected = data["rejected"]
-
-# ── Summary metrics ───────────────────────────────────────────────────────────
-col1, col2, col3 = st.columns(3)
-col1.metric("Total stocks scanned", len(passed) + len(rejected))
-col2.metric("✅ Passed", len(passed))
-col3.metric("❌ Filtered out", len(rejected))
-
-st.divider()
-
-
 def build_df(stocks: list[dict], include_reason: bool = False) -> pd.DataFrame:
     rows = []
     for s in stocks:
@@ -158,16 +123,75 @@ def build_df(stocks: list[dict], include_reason: bool = False) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-# ── Passed stocks ─────────────────────────────────────────────────────────────
-st.subheader(f"✅ Passed stocks ({len(passed)})")
-if passed:
-    st.dataframe(build_df(passed), use_container_width=True, hide_index=True)
-else:
-    st.warning("No stocks passed all filters.")
-
-# ── Rejected stocks ───────────────────────────────────────────────────────────
-with st.expander(f"❌ Filtered-out stocks ({len(rejected)})", expanded=False):
-    if rejected:
-        st.dataframe(build_df(rejected, include_reason=True), use_container_width=True, hide_index=True)
+# ── Tab: Stock Filter ─────────────────────────────────────────────────────────
+with tab_filter:
+    if not run:
+        st.info("Configure filters in the sidebar and click **Filter Stocks** to run.")
     else:
-        st.success("All stocks passed the filters.")
+        with st.spinner("Fetching data from API…"):
+            params = {
+                "exchanges": exchanges,
+                "min_gtgd": min_gtgd20,
+                "statuses": allowed_statuses_labels if allowed_statuses_labels else None,
+                "min_history": min_history,
+                "min_price": min_price,
+                "min_intraday_ratio": min_intraday_pct / 100,
+                "min_volume": min_volume_m * 1e6,
+                "use_exchange": use_exchange,
+                "use_gtgd20": use_gtgd20,
+                "use_status": use_status,
+                "use_history": use_history,
+                "use_price": use_price,
+                "use_intraday": use_intraday,
+                "use_volume": use_volume,
+            }
+            resp = requests.get("http://localhost:8000/stocks", params=params)
+            data = resp.json()
+
+        passed = data["passed"]
+        rejected = data["rejected"]
+        st.session_state["last_stocks"] = passed + rejected
+
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Total stocks scanned", len(passed) + len(rejected))
+        col2.metric("✅ Passed", len(passed))
+        col3.metric("❌ Filtered out", len(rejected))
+
+        st.divider()
+
+        st.subheader(f"✅ Passed stocks ({len(passed)})")
+        if passed:
+            st.dataframe(build_df(passed), use_container_width=True, hide_index=True)
+        else:
+            st.warning("No stocks passed all filters.")
+
+        with st.expander(f"❌ Filtered-out stocks ({len(rejected)})", expanded=False):
+            if rejected:
+                st.dataframe(build_df(rejected, include_reason=True), use_container_width=True, hide_index=True)
+            else:
+                st.success("All stocks passed the filters.")
+
+
+# ── Tab: Stock Assistant ──────────────────────────────────────────────────────
+with tab_chat:
+    if "chat_messages" not in st.session_state:
+        st.session_state.chat_messages = []
+
+    for msg in st.session_state.chat_messages:
+        with st.chat_message(msg["role"]):
+            st.write(msg["content"])
+
+    if prompt := st.chat_input("Ask about stocks…"):
+        st.session_state.chat_messages.append({"role": "user", "content": prompt})
+
+        stocks_context = st.session_state.get("last_stocks")
+        payload = {
+            "messages": st.session_state.chat_messages,
+            "stocks_context": stocks_context,
+        }
+        with st.spinner("Thinking…"):
+            resp = requests.post("http://localhost:8000/chat", json=payload)
+            answer = resp.json()["response"]
+
+        st.session_state.chat_messages.append({"role": "assistant", "content": answer})
+        st.rerun()
