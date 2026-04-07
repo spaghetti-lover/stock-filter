@@ -4,33 +4,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Vietnam Stock Filter — a web app that filters Vietnamese stocks (HOSE/HNX/UPCOM) using trading metrics. Fetches data via the vnstock API, stores it in PostgreSQL, exposes a FastAPI backend, and provides a Streamlit frontend.
+Vietnam Stock Filter — a web app that filters Vietnamese stocks (HOSE/HNX/UPCOM) using trading metrics. Fetches data live via the vnstock API (no database), exposes a FastAPI backend, and provides a Streamlit frontend.
 
 ## Commands
 
 You must install new package with in virtual environment
 
 ```bash
-# Python: always run with -B to avoid bytecode
-python -B main.py
-
-# Database
-make db_start       # Start PostgreSQL container (postgres:latest, port 5432)
-make db_stop        # Stop and remove container
-make migrate        # Run SQL migrations against local DB
 make remove_pycache # Clean __pycache__ directories
 
 # Backend (from repo root)
-cd backend && uvicorn main:app --reload   # http://localhost:8000, docs at /docs
-# if get error missing package with mise just use
-mise deactivate
+cd backend && uv run uvicorn main:app --reload   # http://localhost:8000, docs at /docs
 
 # Frontend (from repo root)
-cd frontend && streamlit run app.py      # http://localhost:8501
+cd frontend && uv run streamlit run app.py --server.headless true   # http://localhost:8501
 
-# Tests
-pytest backend/tests/
-pytest backend/crawler/test_crawler.py
+# Docker (production)
+docker compose up -d --build
 ```
 
 ## Architecture
@@ -39,29 +29,26 @@ Clean Architecture with four layers:
 
 - **Domain** (`backend/domain/`) — `Stock` entity, `StockRepository` interface
 - **Application** (`backend/application/`) — `GetStockUseCase`, DTOs, mappers
-- **Infrastructure** (`backend/infrastructure/`) — `DbStockRepositoryImpl` (asyncpg/PostgreSQL)
-- **Presentation** (`backend/presentation/api/routes/`) — FastAPI routes: `GET /stocks`, `POST /crawler/start`, `GET /crawler/status`
+- **Infrastructure** (`backend/infrastructure/`) — `StockRepositoryImpl` (live vnstock API), AI agents (Claude/Gemini/OpenAI)
+- **Presentation** (`backend/presentation/api/routes/`) — FastAPI routes: `GET /stocks`, `GET /stocks/stream`, `POST /chat`
 
-Frontend (`frontend/`) is a Streamlit app; filtering is split between SQL (exchange, GTGD20) and client-side Python (`filters.py` handles price, status, history, intraday ratio, volume).
+Frontend (`frontend/`) is a Streamlit app; client-side Python (`filters.py`) handles price, status, history, intraday ratio, volume filters.
 
 ### Data Flow
 
-1. **Crawl**: `backend/crawler/crawler.py` → fetches symbols + OHLCV + intraday via vnstock API → `db_writer.py` writes to PostgreSQL
-2. **Query**: Streamlit → `GET /stocks` → `GetStockUseCase` → `DbStockRepositoryImpl` → PostgreSQL
-
-### Key Tables
-
-`symbols`, `trading_history`, `stock_metrics`, `intraday_snapshots`, `intraday_daily` — schema in `backend/db/migrations/001_create_stocks.sql`
+Streamlit → `GET /stocks` → `GetStockUseCase` → `StockRepositoryImpl` → vnstock API (live)
 
 ## Environment
 
-Requires `.env` with:
+Requires `backend/.env` with:
 
 ```
-DATABASE_URL=postgresql://postgres:password@localhost:5432/stock_data
+ANTHROPIC_API_KEY=sk-ant-...
+GOOGLE_API_KEY=AIza...
+OPENAI_API_KEY=sk-proj-...
 ```
 
-`vnstock_data` 3.0.0 (sponsored) is installed in the **system Python** (not `~/.venv`). No API key env var is needed — credentials are embedded in the package.
+`vnstock_data` 3.0.0 (sponsored) is installed in the project `.venv`. No database is used — all stock data is fetched live from the vnstock API.
 
 ## vnstock_data API Usage (this project)
 
