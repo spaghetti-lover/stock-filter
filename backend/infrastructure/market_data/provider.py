@@ -33,7 +33,7 @@ class _RateLimiter:
             self._timestamps.append(time.monotonic())
 
 
-_limiter = _RateLimiter(calls_per_minute=400)
+_limiter = _RateLimiter(calls_per_minute=500)
 
 def get_all_symbols() -> list[dict]:
     """Get all stock symbols from HOSE and HNX exchanges."""

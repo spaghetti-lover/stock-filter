@@ -15,7 +15,7 @@ _semaphore: asyncio.Semaphore | None = None
 # 500 req/min limit; each symbol costs 2 calls (history + intraday).
 # semaphore=3 + 1s sleep → max 3 symbols/sec = 6 req/sec = 360 req/min.
 # You can tune _RATE_DELAY down (e.g. 0.5) or _CONCURRENCY up (e.g. 4) if it's too slow, just keep concurrency * 2 / delay < 8 req/sec.
-_CONCURRENCY = 4
+_CONCURRENCY = 3
 _RATE_DELAY = 1  # seconds to hold the semaphore after API calls
 
 def _get_semaphore() -> asyncio.Semaphore:
