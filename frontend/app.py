@@ -1,8 +1,10 @@
 """Vietnam Stock Filter — Streamlit app."""
 
+import json
+
+import requests
 import streamlit as st
 import pandas as pd
-import requests
 from datetime import datetime
 
 st.set_page_config(page_title="Vietnam Stock Filter", page_icon="📈", layout="wide")
@@ -128,28 +130,51 @@ with tab_filter:
     if not run:
         st.info("Configure filters in the sidebar and click **Filter Stocks** to run.")
     else:
-        with st.spinner("Fetching data from API…"):
-            params = {
-                "exchanges": exchanges,
-                "min_gtgd": min_gtgd20,
-                "statuses": allowed_statuses_labels if allowed_statuses_labels else None,
-                "min_history": min_history,
-                "min_price": min_price,
-                "min_intraday_ratio": min_intraday_pct / 100,
-                "min_volume": min_volume_m * 1e6,
-                "use_exchange": use_exchange,
-                "use_gtgd20": use_gtgd20,
-                "use_status": use_status,
-                "use_history": use_history,
-                "use_price": use_price,
-                "use_intraday": use_intraday,
-                "use_volume": use_volume,
-            }
-            resp = requests.get("http://localhost:8000/stocks", params=params)
+        params = {
+            "exchanges": exchanges,
+            "min_gtgd": min_gtgd20,
+            "statuses": allowed_statuses_labels if allowed_statuses_labels else None,
+            "min_history": min_history,
+            "min_price": min_price,
+            "min_intraday_ratio": min_intraday_pct / 100,
+            "min_volume": min_volume_m * 1e6,
+            "use_exchange": use_exchange,
+            "use_gtgd20": use_gtgd20,
+            "use_status": use_status,
+            "use_history": use_history,
+            "use_price": use_price,
+            "use_intraday": use_intraday,
+            "use_volume": use_volume,
+        }
+
+        progress_bar = st.progress(0, text="Fetching data from API…")
+        status_text = st.empty()
+        data = None
+
+        with requests.get("http://localhost:8000/stocks/stream", params=params, stream=True) as resp:
             if not resp.ok:
                 st.error(f"API error {resp.status_code}: {resp.text}")
                 st.stop()
-            data = resp.json()
+            for raw_line in resp.iter_lines():
+                if not raw_line or not raw_line.startswith(b"data:"):
+                    continue
+                event = json.loads(raw_line[5:].strip())
+                if event["type"] == "progress":
+                    pct = event["processed"] / event["total"]
+                    progress_bar.progress(pct, text=f"Fetching data from API… {event['processed']}/{event['total']} — {event['symbol']}")
+                    status_text.caption(f"Processing **{event['symbol']}**")
+                elif event["type"] == "result":
+                    data = event["data"]
+                elif event["type"] == "error":
+                    st.error(f"API error: {event['detail']}")
+                    st.stop()
+
+        progress_bar.empty()
+        status_text.empty()
+
+        if data is None:
+            st.error("No result received from API.")
+            st.stop()
 
         passed = data["passed"]
         rejected = data["rejected"]

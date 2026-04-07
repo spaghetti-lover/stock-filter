@@ -1,4 +1,4 @@
-from domain.repositories.stock_repository import StockRepository
+from domain.repositories.stock_repository import ProgressCallback, StockRepository
 from application.mappers.stock_mapper import StockMapper
 from application.dto.stock_dto import FilteredStocksResponse
 from application.services.stock_filter import apply_filters
@@ -24,9 +24,10 @@ class GetStockUseCase:
         use_price: bool = True,
         use_intraday: bool = True,
         use_volume: bool = True,
+        on_progress: ProgressCallback | None = None,
     ) -> FilteredStocksResponse:
         min_gtgd_raw = min_gtgd * 1e9
-        stocks = await self.repo.list_stocks(exchanges=exchanges, min_gtgd=min_gtgd_raw)
+        stocks = await self.repo.list_stocks(exchanges=exchanges, min_gtgd=min_gtgd_raw, on_progress=on_progress)
         responses = StockMapper.to_response_list(stocks)
 
         passed, rejected = apply_filters(
