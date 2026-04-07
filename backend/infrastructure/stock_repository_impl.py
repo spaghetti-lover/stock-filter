@@ -9,14 +9,13 @@ from logger import get_logger
 
 log = get_logger(__name__)
 
-_executor = ThreadPoolExecutor(max_workers=20)
+_executor = ThreadPoolExecutor(max_workers=30)
 _semaphore: asyncio.Semaphore | None = None
 
 # 500 req/min limit; each symbol costs 2 calls (history + intraday).
-# semaphore=3 + 1s sleep → max 3 symbols/sec = 6 req/sec = 360 req/min.
-# You can tune _RATE_DELAY down (e.g. 0.5) or _CONCURRENCY up (e.g. 4) if it's too slow, just keep concurrency * 2 / delay < 8 req/sec.
-_CONCURRENCY = 3
-_RATE_DELAY = 1  # seconds to hold the semaphore after API calls
+# The provider-level rate limiter (450 req/min) is the real throttle.
+# Semaphore just caps in-flight symbols to avoid overwhelming the thread pool.
+_CONCURRENCY = 10
 
 def _get_semaphore() -> asyncio.Semaphore:
     global _semaphore
@@ -82,7 +81,6 @@ class StockRepositoryImpl(StockRepository):
                 history_fut = loop.run_in_executor(_executor, get_trading_history, symbol, fetch_days)
                 intraday_fut = loop.run_in_executor(_executor, get_intraday, symbol)
                 history_rows, intraday_rows = await asyncio.gather(history_fut, intraday_fut)
-                await asyncio.sleep(_RATE_DELAY)
 
                 if not history_rows:
                     log.debug("No history for %s, skipping", symbol)

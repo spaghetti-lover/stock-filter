@@ -1,7 +1,6 @@
 import time
 import threading
 from collections import deque
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 
 from vnstock_data import Reference, Market
@@ -20,20 +19,22 @@ class _RateLimiter:
         self._lock = threading.Lock()
 
     def acquire(self):
-        with self._lock:
-            now = time.monotonic()
-            while self._timestamps and now - self._timestamps[0] >= self._window:
-                self._timestamps.popleft()
+        while True:
+            with self._lock:
+                now = time.monotonic()
+                while self._timestamps and now - self._timestamps[0] >= self._window:
+                    self._timestamps.popleft()
 
-            if len(self._timestamps) >= self._limit:
-                sleep_for = self._window - (now - self._timestamps[0])
-                log.debug("Rate limit reached, sleeping %.2fs", sleep_for)
-                time.sleep(max(sleep_for, 0))
+                if len(self._timestamps) < self._limit:
+                    self._timestamps.append(time.monotonic())
+                    return
 
-            self._timestamps.append(time.monotonic())
+                sleep_for = self._window - (now - self._timestamps[0]) + 0.05
+            log.debug("Rate limit reached, sleeping %.2fs", sleep_for)
+            time.sleep(max(sleep_for, 0))
 
 
-_limiter = _RateLimiter(calls_per_minute=120)
+_limiter = _RateLimiter(calls_per_minute=450)
 
 def get_all_symbols() -> list[dict]:
     """Get all stock symbols from HOSE and HNX exchanges."""

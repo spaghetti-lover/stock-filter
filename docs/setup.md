@@ -1,60 +1,47 @@
-# Setup & Running
+# Local
 
-## Prerequisites
-
-- Python 3.13+
-- `uv` package manager
-- `vnstock_data` installed in project `.venv` (private/sponsored package — copy `.venv` manually)
-
-## Environment
-
-Create `backend/.env`:
+## Frontend
 
 ```
-ANTHROPIC_API_KEY=sk-ant-...
-GOOGLE_API_KEY=AIza...
-OPENAI_API_KEY=sk-proj-...
+make frontend
 ```
 
-## Local Development
+## Backend
 
-```bash
-# Backend (from repo root)
-cd backend && uv run uvicorn main:app --reload
-# http://localhost:8000 — docs at /docs
-
-# Frontend (from repo root)
-cd frontend && uv run streamlit run app.py --server.headless true
-# http://localhost:8501
+```
+make backend
 ```
 
-## Docker (VPS / Production)
+# Server
 
-All services run via Docker Compose. The `.venv` must be present in the repo root before building (it contains `vnstock_data` which is not on PyPI).
-
-```bash
-# Copy .venv to VPS first
-rsync -az --progress .venv/ user@your-vps:/path/to/stock-filter/.venv/
-
-# Copy .env to VPS
-scp backend/.env user@your-vps:/path/to/stock-filter/backend/.env
-
-# On VPS — build and start in background
-docker compose up -d --build
-
-# Logs
-docker compose logs -f
-
-# Stop
-docker compose down
+```
+git clone
 ```
 
-Services:
-- **backend** → `http://your-vps:8000`
-- **frontend** → `http://your-vps:8501`
-
-## Useful Commands
-
-```bash
-make remove_pycache   # Clean __pycache__ directories
 ```
+git pull
+```
+
+- Add .env
+
+```
+docker-compose up -d --build
+```
+
+```
+docker compose exec backend sh
+```
+
+```
+apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/
+```
+
+```
+curl -fsSL https://claude.ai/install.sh | bash
+```
+
+```
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc && . ~/.bashrc
+```
+
+- Login Claude
