@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import os
 
 from fastapi import HTTPException
 from google import genai
@@ -166,7 +167,7 @@ _TOOLS = types.Tool(
 class GeminiAgent(AgentProvider):
     def __init__(self, model: str = "gemini-2.5-flash"):
         self._model = model
-        self._client = genai.Client()
+        self._client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
 
     async def chat(self, messages: list[dict], system_prompt: str) -> str:
         history: list[types.ContentOrDict] = [

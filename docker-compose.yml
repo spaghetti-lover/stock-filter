@@ -5,8 +5,8 @@ services:
     working_dir: /app/backend
     ports:
       - "8000:8000"
-    environment:
-      DATABASE_URL: postgresql://postgres:password@db:5432/stock_data
+    env_file:
+      - backend/.env
 
   frontend:
     build: .
@@ -14,10 +14,5 @@ services:
     working_dir: /app/frontend
     ports:
       - "8501:8501"
-    environment:
-      DATABASE_URL: postgresql://postgres:password@db:5432/stock_data
     depends_on:
       - backend
-
-volumes:
-  pgdata:
