@@ -9,7 +9,7 @@ import json
 
 from claude_agent_sdk import tool, create_sdk_mcp_server
 
-from market_data.provider import get_all_symbols, get_trading_history, get_intraday
+from infrastructure.market_data.provider import get_all_symbols, get_trading_history, get_intraday
 
 
 def _to_text(data) -> dict:
