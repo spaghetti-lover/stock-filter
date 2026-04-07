@@ -6,7 +6,6 @@ COPY .venv/ .venv/
 COPY backend/ backend/
 COPY frontend/ frontend/
 
-ENV PATH="/app/.venv/bin:$PATH"
-ENV VIRTUAL_ENV="/app/.venv"
+ENV PYTHONPATH="/app/.venv/lib/python3.13/site-packages"
 
 EXPOSE 8000 8501
