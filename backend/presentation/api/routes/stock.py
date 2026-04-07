@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from application.use_case.get_stock import GetStockUseCase
 from application.dto.stock_dto import FilteredStocksResponse
 from infrastructure.stock_repository_impl import StockRepositoryImpl
@@ -50,6 +50,6 @@ async def get_stock(
         )
         log.info("GET /stocks -> %d passed, %d rejected", len(result.passed), len(result.rejected))
         return result
-    except BaseException:
+    except Exception as e:
         log.error("GET /stocks failed", exc_info=True)
-        raise
+        raise HTTPException(status_code=500, detail=str(e))
