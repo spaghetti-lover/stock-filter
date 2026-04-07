@@ -33,7 +33,7 @@ class _RateLimiter:
             self._timestamps.append(time.monotonic())
 
 
-_limiter = _RateLimiter(calls_per_minute=500)
+_limiter = _RateLimiter(calls_per_minute=120)
 
 def get_all_symbols() -> list[dict]:
     """Get all stock symbols from HOSE and HNX exchanges."""
@@ -54,7 +54,7 @@ def get_trading_history(symbol: str, days: int = 100) -> list[dict]:
     start = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
     try:
         df = Market().equity(symbol).ohlcv(start=start, end=end)
-    except ValueError:
+    except (ValueError, ConnectionResetError, ConnectionError):
         log.debug("No trading history for %s", symbol)
         return []
     return df.to_dict(orient="records")
@@ -66,7 +66,7 @@ def get_intraday(symbol: str) -> list[dict]:
     _limiter.acquire()
     try:
         df = Market().equity(symbol).intraday()
-    except ValueError:
+    except (ValueError, ConnectionResetError, ConnectionError):
         log.debug("No intraday data for %s", symbol)
         return []
     df["time"] = df["time"].dt.time
