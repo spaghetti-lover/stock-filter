@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "stock-crawler": {
-      "command": "python",
-      "args": ["-B", "/home/dtl/Project/stock-filter/backend/crawler/mcp_server.py"]
-    }
-  }
-}
