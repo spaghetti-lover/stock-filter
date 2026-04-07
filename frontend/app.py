@@ -1,11 +1,14 @@
 """Vietnam Stock Filter — Streamlit app."""
 
 import json
+import os
 
 import requests
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+
+BACKEND_URL = os.environ.get("BACKEND_URL", "{BACKEND_URL}")
 
 st.set_page_config(page_title="Vietnam Stock Filter", page_icon="📈", layout="wide")
 
@@ -151,7 +154,7 @@ with tab_filter:
         status_text = st.empty()
         data = None
 
-        with requests.get("http://localhost:8000/stocks/stream", params=params, stream=True) as resp:
+        with requests.get("{BACKEND_URL}/stocks/stream", params=params, stream=True) as resp:
             if not resp.ok:
                 st.error(f"API error {resp.status_code}: {resp.text}")
                 st.stop()
@@ -226,7 +229,7 @@ with tab_chat:
             "provider": provider,
         }
         with st.spinner("Thinking…"):
-            resp = requests.post("http://localhost:8000/chat", json=payload)
+            resp = requests.post("{BACKEND_URL}/chat", json=payload)
 
         if not resp.ok:
             try:

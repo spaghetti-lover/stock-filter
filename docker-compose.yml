@@ -7,6 +7,8 @@ services:
       - "8000:8000"
     env_file:
       - backend/.env
+    volumes:
+      - ~/.vnstock:/root/.vnstock:ro
 
   frontend:
     build: .
@@ -14,5 +16,7 @@ services:
     working_dir: /app/frontend
     ports:
       - "8501:8501"
+    environment:
+      - BACKEND_URL=http://backend:8000
     depends_on:
       - backend
