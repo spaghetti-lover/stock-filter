@@ -3,7 +3,7 @@ from datetime import datetime, timezone, timedelta
 import asyncpg
 
 from domain.entities.stock import Stock
-from domain.repositories.stock_repository import StockRepository
+from domain.repositories.stock_repository import ProgressCallback, StockRepository
 from db.connection import get_pool
 from logger import get_logger
 
@@ -46,7 +46,7 @@ ORDER BY s.symbol
 
 
 class DbStockRepositoryImpl(StockRepository):
-    async def list_stocks(self, exchanges: set[str] | None = None, min_gtgd: float = 0.0) -> list[Stock]:
+    async def list_stocks(self, exchanges: set[str] | None = None, min_gtgd: float = 0.0, on_progress: ProgressCallback | None = None) -> list[Stock]:
         now = datetime.now(tz=timezone(timedelta(hours=7)))
         expected_fraction = _get_expected_fraction_at_time(now.hour, now.minute)
 
@@ -58,8 +58,13 @@ class DbStockRepositoryImpl(StockRepository):
         rows = await pool.fetch(_QUERY, exchanges_list, min_gtgd)
 
         result = []
+        processed_count = 0
+        total = len(rows)
         for row in rows:
             gtgd20 = float(row["gtgd20"]) if row["gtgd20"] is not None else 0.0
+            processed_count += 1
+            if on_progress:
+                await on_progress(processed_count, total, row["symbol"])
             result.append(Stock(
                 symbol=row["symbol"],
                 exchange=row["exchange"],
