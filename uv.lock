@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.13"
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'win32'",
@@ -1690,6 +1690,7 @@ dependencies = [
     { name = "fastmcp" },
     { name = "google-genai" },
     { name = "openai-agents" },
+    { name = "pandas" },
     { name = "streamlit" },
 ]
 
@@ -1702,6 +1703,7 @@ requires-dist = [
     { name = "fastmcp", specifier = ">=3.2.0" },
     { name = "google-genai", specifier = ">=1.70.0" },
     { name = "openai-agents", specifier = ">=0.13.5" },
+    { name = "pandas", specifier = ">=3.0.2" },
     { name = "streamlit", specifier = ">=1.56.0" },
 ]
 

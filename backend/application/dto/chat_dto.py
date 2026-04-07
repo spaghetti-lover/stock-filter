@@ -9,6 +9,7 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     messages: list[ChatMessage]
     stocks_context: list[dict] | None = None
+    provider: str = "claude"
 
 
 class ChatResponse(BaseModel):

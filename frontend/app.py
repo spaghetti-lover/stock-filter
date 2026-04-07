@@ -180,6 +180,13 @@ with tab_chat:
     if "chat_messages" not in st.session_state:
         st.session_state.chat_messages = []
 
+    provider = st.selectbox(
+        "LLM provider",
+        options=["claude", "gemini", "openai"],
+        index=0,
+        key="chat_provider",
+    )
+
     for msg in st.session_state.chat_messages:
         with st.chat_message(msg["role"]):
             st.write(msg["content"])
@@ -191,6 +198,7 @@ with tab_chat:
         payload = {
             "messages": st.session_state.chat_messages,
             "stocks_context": stocks_context,
+            "provider": provider,
         }
         with st.spinner("Thinking…"):
             resp = requests.post("http://localhost:8000/chat", json=payload)
