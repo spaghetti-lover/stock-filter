@@ -51,13 +51,16 @@ class StockRepositoryImpl(StockRepository):
         self,
         exchanges: set[str] | None = None,
         min_gtgd: float = 0.0,
+        min_history_sessions: int = 0,
         on_progress: ProgressCallback | None = None,
     ) -> list[Stock]:
         now = datetime.now(tz=timezone(timedelta(hours=7)))
         expected_fraction = _get_expected_fraction_at_time(now.hour, now.minute)
         loop = asyncio.get_event_loop()
 
-        log.info("list_stocks started: exchanges=%s min_gtgd=%s fraction=%.2f", exchanges, min_gtgd, expected_fraction)
+        # Convert session count → calendar days (Vietnam ~252 trading days/year) + 15-day buffer.
+        fetch_days = max(int(min_history_sessions * 365 / 252) + 15, 90)
+        log.info("list_stocks started: exchanges=%s min_gtgd=%s fraction=%.2f fetch_days=%d", exchanges, min_gtgd, expected_fraction, fetch_days)
 
         symbols = await loop.run_in_executor(_executor, get_all_symbols)
         if exchanges:
@@ -76,7 +79,7 @@ class StockRepositoryImpl(StockRepository):
                 exchange = item["exchange"]
 
                 log.info("Fetching data for %s (%s)", symbol, exchange)
-                history_fut = loop.run_in_executor(_executor, get_trading_history, symbol, 60)
+                history_fut = loop.run_in_executor(_executor, get_trading_history, symbol, fetch_days)
                 intraday_fut = loop.run_in_executor(_executor, get_intraday, symbol)
                 history_rows, intraday_rows = await asyncio.gather(history_fut, intraday_fut)
                 await asyncio.sleep(_RATE_DELAY)
