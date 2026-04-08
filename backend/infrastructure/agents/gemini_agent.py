@@ -10,7 +10,7 @@ from google.genai import types
 from google.genai.errors import ClientError
 
 from domain.agents.agent_provider import AgentProvider
-from infrastructure.market_data.provider import get_all_symbols, get_trading_history, get_intraday
+from infrastructure.market_data.data import get_all_symbols, get_trading_history, get_intraday
 
 
 def _to_gemini_role(role: str) -> str:

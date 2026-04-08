@@ -4,7 +4,7 @@ from datetime import datetime, timezone, timedelta
 
 from domain.entities.stock import Stock
 from domain.repositories.stock_repository import ProgressCallback, StockRepository
-from infrastructure.market_data.provider import get_all_symbols, get_trading_history, get_intraday
+from infrastructure.market_data.data import get_all_symbols, get_trading_history, get_intraday
 from logger import get_logger
 
 log = get_logger(__name__)

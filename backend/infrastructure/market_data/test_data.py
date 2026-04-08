@@ -1,4 +1,4 @@
-from infrastructure.market_data.provider import get_all_symbols, get_intraday, get_trading_history
+from infrastructure.market_data.data import get_all_symbols, get_intraday, get_trading_history
 
 def test_get_all_symbols():
   symbols = get_all_symbols()
