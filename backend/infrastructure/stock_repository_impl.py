@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone, timedelta
 
 from domain.entities.stock import Stock
-from domain.repositories.stock_repository import ProgressCallback, StockRepository
+from domain.repositories.stock_repository import EarlyRejected, ProgressCallback, StockRepository
 from infrastructure.market_data.data import get_all_symbols, get_trading_history, get_intraday
 from logger import get_logger
 
@@ -52,7 +52,7 @@ class StockRepositoryImpl(StockRepository):
         min_gtgd: float = 0.0,
         min_history_sessions: int = 0,
         on_progress: ProgressCallback | None = None,
-    ) -> list[Stock]:
+    ) -> tuple[list[Stock], list[EarlyRejected]]:
         now = datetime.now(tz=timezone(timedelta(hours=7)))
         expected_fraction = _get_expected_fraction_at_time(now.hour, now.minute)
         loop = asyncio.get_event_loop()
@@ -71,7 +71,7 @@ class StockRepositoryImpl(StockRepository):
         processed_count = 0
         counter_lock = asyncio.Lock()
 
-        async def process(item: dict) -> Stock | None:
+        async def process(item: dict) -> Stock | tuple[str, str, str]:
             nonlocal processed_count
             async with sem:
                 symbol = item["symbol"]
@@ -84,7 +84,7 @@ class StockRepositoryImpl(StockRepository):
 
                 if not history_rows:
                     log.debug("No history for %s, skipping", symbol)
-                    stock = None
+                    result = (symbol, exchange, "No trading history available")
                 else:
                     current_price = history_rows[-1]["close"]
                     history_sessions = len(history_rows)
@@ -93,11 +93,11 @@ class StockRepositoryImpl(StockRepository):
 
                     if gtgd20 < min_gtgd:
                         log.debug("Skipping %s: gtgd20=%.2f < min_gtgd=%.2f", symbol, gtgd20, min_gtgd)
-                        stock = None
+                        result = (symbol, exchange, f"GTGD20 {gtgd20 / 1e9:.1f}B < {min_gtgd / 1e9:.0f}B")
                     else:
                         today_value = sum(r["price"] * 1000 * r["volume"] for r in intraday_rows) if intraday_rows else 0.0
                         avg_intraday_expected = gtgd20 * expected_fraction
-                        stock = Stock(
+                        result = Stock(
                             symbol=symbol,
                             exchange=exchange,
                             status="normal",
@@ -115,9 +115,10 @@ class StockRepositoryImpl(StockRepository):
                 if on_progress:
                     await on_progress(processed_count, total, symbol)
 
-            return stock
+            return result
 
-        results = await asyncio.gather(*[process(item) for item in symbols])
-        result = [r for r in results if r is not None]
-        log.info("list_stocks done: %d stocks returned", len(result))
-        return result
+        raw_results = await asyncio.gather(*[process(item) for item in symbols])
+        stocks = [r for r in raw_results if isinstance(r, Stock)]
+        early_rejected = [r for r in raw_results if isinstance(r, tuple)]
+        log.info("list_stocks done: %d stocks, %d early-rejected", len(stocks), len(early_rejected))
+        return stocks, early_rejected

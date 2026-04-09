@@ -1,6 +1,6 @@
 from domain.repositories.stock_repository import ProgressCallback, StockRepository
 from application.mappers.stock_mapper import StockMapper
-from application.dto.stock_dto import FilteredStocksResponse
+from application.dto.stock_dto import FilteredStocksResponse, GetStockResponse
 from application.services.stock_filter import apply_filters
 
 
@@ -27,7 +27,7 @@ class GetStockUseCase:
         on_progress: ProgressCallback | None = None,
     ) -> FilteredStocksResponse:
         min_gtgd_raw = min_gtgd * 1e9
-        stocks = await self.repo.list_stocks(
+        stocks, early_rejected = await self.repo.list_stocks(
             exchanges=exchanges,
             min_gtgd=min_gtgd_raw,
             min_history_sessions=min_history if use_history else 0,
@@ -52,5 +52,20 @@ class GetStockUseCase:
             use_intraday=use_intraday,
             use_volume=use_volume,
         )
+
+        # Include early-rejected stocks (no history / below min_gtgd before full fetch)
+        for symbol, exchange, reason in early_rejected:
+            rejected.append(GetStockResponse(
+                symbol=symbol,
+                exchange=exchange,
+                status="N/A",
+                current_price=0.0,
+                gtgd20=0.0,
+                history_sessions=0,
+                today_value=0.0,
+                avg_intraday_expected=0.0,
+                intraday_ratio=None,
+                reject_reason=reason,
+            ))
 
         return FilteredStocksResponse(passed=passed, rejected=rejected)
