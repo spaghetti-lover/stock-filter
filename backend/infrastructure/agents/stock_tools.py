@@ -10,7 +10,7 @@ import json
 from claude_agent_sdk import tool, create_sdk_mcp_server
 
 from infrastructure.market_data.data import get_all_symbols, get_trading_history, get_intraday
-from infrastructure.market_data.news import get_stock_news, get_market_news
+from infrastructure.market_data.news import get_stock_news, get_market_news, search_news, get_trending_topics
 
 
 def _to_text(data) -> dict:
@@ -159,6 +159,35 @@ async def market_news_tool(args: dict) -> dict:
     return _to_text({"count": len(articles), "articles": articles})
 
 
+@tool(
+    "search_news",
+    "Search recent news by keyword across CafeF and VietStock RSS feeds. "
+    "Useful for sector queries (e.g. 'ngân hàng', 'bất động sản'), company full names, or any topic.",
+    {"keyword": str, "limit": int},
+)
+async def search_news_tool(args: dict) -> dict:
+    keyword = args["keyword"]
+    limit = args.get("limit", 10)
+    articles = await asyncio.to_thread(search_news, keyword, limit)
+    if not articles:
+        return _error(f"No news found for keyword: {keyword}")
+    return _to_text({"keyword": keyword, "count": len(articles), "articles": articles})
+
+
+@tool(
+    "trending_topics",
+    "Get the most frequently appearing phrases in today's financial news headlines from CafeF. "
+    "Returns trending n-gram phrases and their frequency counts.",
+    {"top_n": int},
+)
+async def trending_topics_tool(args: dict) -> dict:
+    top_n = args.get("top_n", 20)
+    trends = await asyncio.to_thread(get_trending_topics, top_n)
+    if not trends:
+        return _error("No trending topics found")
+    return _to_text({"top_n": top_n, "trends": trends})
+
+
 # ── Server factory ───────────────────────────────────────────────────────────
 
 
@@ -172,6 +201,8 @@ TOOL_NAMES = [
     f"mcp__{_SERVER_NAME}__compare_stocks",
     f"mcp__{_SERVER_NAME}__stock_news",
     f"mcp__{_SERVER_NAME}__market_news",
+    f"mcp__{_SERVER_NAME}__search_news",
+    f"mcp__{_SERVER_NAME}__trending_topics",
 ]
 
 
@@ -188,5 +219,7 @@ def create_stock_mcp_server():
             compare_stocks_tool,
             stock_news_tool,
             market_news_tool,
+            search_news_tool,
+            trending_topics_tool,
         ],
     )

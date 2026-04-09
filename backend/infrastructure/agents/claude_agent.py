@@ -1,10 +1,13 @@
 """Claude implementation using the Claude Agent SDK (claude-agent-sdk package)."""
 
-from claude_agent_sdk import query, ClaudeAgentOptions, ResultMessage
+from logger import get_logger
+
+from claude_agent_sdk import query, ClaudeAgentOptions, ResultMessage, AssistantMessage, SystemMessage
 
 from domain.agents.agent_provider import AgentProvider
 from infrastructure.agents.stock_tools import create_stock_mcp_server, TOOL_NAMES
 
+log = get_logger(__name__)
 
 def _format_history(messages: list[dict]) -> str:
     """Render prior turns as readable text so the agent has conversation context."""
@@ -41,5 +44,8 @@ class ClaudeAgent(AgentProvider):
                 if message.is_error:
                     return f"Error: {message.result or 'unknown error'}"
                 return message.result or ""
-
+            elif isinstance(message, AssistantMessage):
+                log.info(f"Assistant message: {message}")
+            elif isinstance(message, SystemMessage):
+                log.info(f"System message: {message.data}")
         return ""

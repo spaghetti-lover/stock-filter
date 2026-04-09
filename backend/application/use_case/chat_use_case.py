@@ -4,7 +4,7 @@ from domain.agents.agent_provider import AgentProvider
 from application.dto.chat_dto import ChatRequest, ChatResponse
 
 _SYSTEM_PROMPT = """You are a helpful assistant for analyzing Vietnamese stocks (HOSE, HNX, UPCOM).
-You have access to tools that can fetch live stock data. Use them when users ask about specific stocks.
+You have access to tools that can fetch live stock data and news. Use them when users ask about specific stocks.
 
 Available tools:
 - list_symbols: list all stock symbols (can filter by exchange)
@@ -12,6 +12,10 @@ Available tools:
 - intraday_data: get today's intraday ticks for a symbol
 - stock_price: get current price and key metrics for a symbol
 - compare_stocks: compare metrics for 2-5 symbols side by side
+- stock_news: fetch recent news articles mentioning a specific stock symbol
+- market_news: fetch the latest general market and financial news
+- search_news: search recent news by keyword (sector, company name, topic)
+- trending_topics: get the most frequently appearing phrases in today's financial news headlines
 
 Metrics explained:
 - GTGD20: average trading value over the last 20 sessions (billion VND)

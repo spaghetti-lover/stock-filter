@@ -11,7 +11,7 @@ from google.genai.errors import ClientError
 
 from domain.agents.agent_provider import AgentProvider
 from infrastructure.market_data.data import get_all_symbols, get_trading_history, get_intraday
-from infrastructure.market_data.news import get_stock_news, get_market_news
+from infrastructure.market_data.news import get_stock_news, get_market_news, search_news, get_trending_topics
 
 
 def _to_gemini_role(role: str) -> str:
@@ -76,6 +76,20 @@ async def _market_news(limit: int = 10) -> dict:
     return {"count": len(articles), "articles": articles}
 
 
+async def _search_news(keyword: str, limit: int = 10) -> dict:
+    articles = await asyncio.to_thread(search_news, keyword, limit)
+    if not articles:
+        return {"error": f"No news found for keyword: {keyword}"}
+    return {"keyword": keyword, "count": len(articles), "articles": articles}
+
+
+async def _trending_topics(top_n: int = 20) -> dict:
+    trends = await asyncio.to_thread(get_trending_topics, top_n)
+    if not trends:
+        return {"error": "No trending topics found"}
+    return {"top_n": top_n, "trends": trends}
+
+
 async def _compare_stocks(symbols: str) -> dict | list:
     symbol_list = [s.strip().upper() for s in symbols.split(",") if s.strip()]
     if len(symbol_list) < 2:
@@ -110,6 +124,8 @@ _TOOL_DISPATCH = {
     "compare_stocks": _compare_stocks,
     "stock_news": _stock_news,
     "market_news": _market_news,
+    "search_news": _search_news,
+    "trending_topics": _trending_topics,
 }
 
 # ── Gemini function declarations ──────────────────────────────────────────────
@@ -196,6 +212,28 @@ _TOOLS = types.Tool(
                 type=types.Type.OBJECT,
                 properties={
                     "limit": types.Schema(type=types.Type.INTEGER, description="Maximum number of articles to return (default 10)"),
+                },
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="search_news",
+            description="Search recent news by keyword across CafeF and VietStock RSS feeds. Useful for sector queries (e.g. 'ngân hàng', 'bất động sản'), company full names, or any topic beyond a ticker symbol.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "keyword": types.Schema(type=types.Type.STRING, description="Search keyword or phrase, e.g. 'ngân hàng' or 'Vietcombank'"),
+                    "limit": types.Schema(type=types.Type.INTEGER, description="Maximum number of articles to return (default 10)"),
+                },
+                required=["keyword"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="trending_topics",
+            description="Get the most frequently appearing phrases in today's financial news headlines from CafeF. Returns trending n-gram phrases and their frequency counts.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "top_n": types.Schema(type=types.Type.INTEGER, description="Number of top trending phrases to return (default 20)"),
                 },
             ),
         ),
