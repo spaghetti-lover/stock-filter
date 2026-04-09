@@ -10,6 +10,7 @@ import json
 from claude_agent_sdk import tool, create_sdk_mcp_server
 
 from infrastructure.market_data.data import get_all_symbols, get_trading_history, get_intraday
+from infrastructure.market_data.news import get_stock_news, get_market_news
 
 
 def _to_text(data) -> dict:
@@ -131,6 +132,33 @@ async def compare_stocks_tool(args: dict) -> dict:
     return _to_text(results)
 
 
+@tool(
+    "stock_news",
+    "Fetch recent news articles mentioning a specific stock symbol from CafeF RSS feed.",
+    {"symbol": str, "limit": int},
+)
+async def stock_news_tool(args: dict) -> dict:
+    symbol = args["symbol"].upper()
+    limit = args.get("limit", 10)
+    articles = await asyncio.to_thread(get_stock_news, symbol, limit)
+    if not articles:
+        return _error(f"No recent news found for {symbol}")
+    return _to_text({"symbol": symbol, "count": len(articles), "articles": articles})
+
+
+@tool(
+    "market_news",
+    "Fetch the latest general market and financial news from CafeF RSS feed.",
+    {"limit": int},
+)
+async def market_news_tool(args: dict) -> dict:
+    limit = args.get("limit", 10)
+    articles = await asyncio.to_thread(get_market_news, limit)
+    if not articles:
+        return _error("No market news available")
+    return _to_text({"count": len(articles), "articles": articles})
+
+
 # ── Server factory ───────────────────────────────────────────────────────────
 
 
@@ -142,6 +170,8 @@ TOOL_NAMES = [
     f"mcp__{_SERVER_NAME}__intraday_data",
     f"mcp__{_SERVER_NAME}__stock_price",
     f"mcp__{_SERVER_NAME}__compare_stocks",
+    f"mcp__{_SERVER_NAME}__stock_news",
+    f"mcp__{_SERVER_NAME}__market_news",
 ]
 
 
@@ -156,5 +186,7 @@ def create_stock_mcp_server():
             intraday_data_tool,
             stock_price_tool,
             compare_stocks_tool,
+            stock_news_tool,
+            market_news_tool,
         ],
     )

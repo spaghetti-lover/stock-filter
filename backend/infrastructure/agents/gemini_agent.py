@@ -11,6 +11,7 @@ from google.genai.errors import ClientError
 
 from domain.agents.agent_provider import AgentProvider
 from infrastructure.market_data.data import get_all_symbols, get_trading_history, get_intraday
+from infrastructure.market_data.news import get_stock_news, get_market_news
 
 
 def _to_gemini_role(role: str) -> str:
@@ -61,6 +62,20 @@ async def _stock_price(symbol: str) -> dict:
     }
 
 
+async def _stock_news(symbol: str, limit: int = 10) -> dict:
+    articles = await asyncio.to_thread(get_stock_news, symbol.upper(), limit)
+    if not articles:
+        return {"error": f"No recent news found for {symbol}"}
+    return {"symbol": symbol, "count": len(articles), "articles": articles}
+
+
+async def _market_news(limit: int = 10) -> dict:
+    articles = await asyncio.to_thread(get_market_news, limit)
+    if not articles:
+        return {"error": "No market news available"}
+    return {"count": len(articles), "articles": articles}
+
+
 async def _compare_stocks(symbols: str) -> dict | list:
     symbol_list = [s.strip().upper() for s in symbols.split(",") if s.strip()]
     if len(symbol_list) < 2:
@@ -93,6 +108,8 @@ _TOOL_DISPATCH = {
     "intraday_data": _intraday_data,
     "stock_price": _stock_price,
     "compare_stocks": _compare_stocks,
+    "stock_news": _stock_news,
+    "market_news": _market_news,
 }
 
 # ── Gemini function declarations ──────────────────────────────────────────────
@@ -158,6 +175,28 @@ _TOOLS = types.Tool(
                     ),
                 },
                 required=["symbols"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="stock_news",
+            description="Fetch recent news articles mentioning a specific stock symbol from CafeF RSS feed.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "symbol": types.Schema(type=types.Type.STRING, description="Stock symbol, e.g. VCB"),
+                    "limit": types.Schema(type=types.Type.INTEGER, description="Maximum number of articles to return (default 10)"),
+                },
+                required=["symbol"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="market_news",
+            description="Fetch the latest general market and financial news from CafeF RSS feed.",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "limit": types.Schema(type=types.Type.INTEGER, description="Maximum number of articles to return (default 10)"),
+                },
             ),
         ),
     ]
