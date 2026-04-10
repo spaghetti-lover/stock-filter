@@ -4,7 +4,8 @@ from datetime import datetime, timezone, timedelta
 
 from domain.entities.stock import Stock
 from domain.repositories.stock_repository import EarlyRejected, ProgressCallback, StockRepository
-from infrastructure.market_data.data import get_all_symbols, get_trading_history, get_intraday
+from domain.value_objects.market_regime import MarketRegime
+from infrastructure.market_data.data import get_all_symbols, get_trading_history, get_intraday, get_vnindex_history
 from logger import get_logger
 
 log = get_logger(__name__)
@@ -110,6 +111,13 @@ class StockRepositoryImpl(StockRepository):
                     last20_values = [r["close"] * 1000 * r["volume"] for r in history_rows[-20:]]
                     gtgd20 = sum(last20_values) / len(last20_values)
 
+                    # CV = std(GTGD_20) / mean(GTGD_20) * 100 (population std)
+                    if len(last20_values) >= 20 and gtgd20 > 0:
+                        variance = sum((x - gtgd20) ** 2 for x in last20_values) / len(last20_values)
+                        cv = (variance ** 0.5 / gtgd20) * 100.0
+                    else:
+                        cv = None
+
                     if gtgd20 < min_gtgd:
                         log.debug("Skipping %s: gtgd20=%.2f < min_gtgd=%.2f", symbol, gtgd20, min_gtgd)
                         result = (symbol, exchange, f"GTGD20 {gtgd20 / 1e9:.1f}B < {min_gtgd / 1e9:.0f}B")
@@ -131,6 +139,7 @@ class StockRepositoryImpl(StockRepository):
                             intraday_ratio=today_value / avg_intraday_expected if avg_intraday_expected > 0 else None,
                             is_ceiling=is_ceiling,
                             is_floor=is_floor,
+                            cv=cv,
                         )
 
             async with counter_lock:
@@ -146,3 +155,17 @@ class StockRepositoryImpl(StockRepository):
         early_rejected = [r for r in raw_results if isinstance(r, tuple)]
         log.info("list_stocks done: %d stocks, %d early-rejected", len(stocks), len(early_rejected))
         return stocks, early_rejected
+
+    async def get_market_regime(self) -> MarketRegime | None:
+        loop = asyncio.get_event_loop()
+        rows = await loop.run_in_executor(_executor, get_vnindex_history, 40)
+        if not rows or len(rows) < 20:
+            log.warning("VNINDEX history insufficient (%d rows), skipping regime gate", len(rows) if rows else 0)
+            return None
+        closes = [r["close"] for r in rows]
+        vnindex_close = closes[-1]
+        ma5 = sum(closes[-5:]) / 5
+        ma20 = sum(closes[-20:]) / 20
+        regime = MarketRegime.from_values(close=vnindex_close, ma5=ma5, ma20=ma20)
+        log.info("Market regime: %s (close=%.2f ma5=%.2f ma20=%.2f ratio=%.4f)", regime.state, vnindex_close, ma5, ma20, regime.ratio)
+        return regime

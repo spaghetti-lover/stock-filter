@@ -61,6 +61,20 @@ def get_trading_history(symbol: str, days: int = 100) -> list[dict]:
     return df.to_dict(orient="records")
 
 
+def get_vnindex_history(days: int = 40) -> list[dict]:
+    """Get daily OHLCV for VNINDEX (40-day window gives headroom for 20-session MA)."""
+    log.debug("Fetching VNINDEX history: days=%d", days)
+    _limiter.acquire()
+    end = datetime.now().strftime("%Y-%m-%d")
+    start = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+    try:
+        df = Market().equity("VNINDEX").ohlcv(start=start, end=end)
+    except (ValueError, ConnectionResetError, ConnectionError):
+        log.debug("No VNINDEX history available")
+        return []
+    return df.to_dict(orient="records")
+
+
 def get_intraday(symbol: str) -> list[dict]:
     """Get intraday snapshots for a symbol."""
     log.debug("Fetching intraday: symbol=%s", symbol)

@@ -20,6 +20,8 @@ def apply_filters(
     use_intraday: bool = True,
     use_volume: bool = True,
     exclude_ceiling_floor: bool = True,
+    cv_cap: float = 200.0,
+    use_cv: bool = True,
 ) -> tuple[list[GetStockResponse], list[GetStockResponse]]:
     """Filter stocks and return (passed, rejected) lists."""
     passed = []
@@ -32,6 +34,7 @@ def apply_filters(
             min_price, min_intraday_ratio, min_volume,
             use_exchange, use_gtgd20, use_status, use_history,
             use_price, use_intraday, use_volume, exclude_ceiling_floor,
+            cv_cap, use_cv,
         )
         if reason:
             rejected.append(stock.model_copy(update={"reject_reason": reason}))
@@ -58,6 +61,8 @@ def _check(
     use_intraday: bool,
     use_volume: bool,
     exclude_ceiling_floor: bool,
+    cv_cap: float,
+    use_cv: bool,
 ) -> str | None:
     """Return rejection reason string, or None if stock passes all filters."""
     if use_exchange and exchanges and s.exchange not in exchanges:
@@ -85,6 +90,9 @@ def _check(
 
     if use_volume and s.today_value < min_volume:
         return f"Volume {s.today_value / 1e6:.1f}M VND < {min_volume / 1e6:.0f}M VND"
+
+    if use_cv and s.cv is not None and s.cv >= cv_cap:
+        return f"CV {s.cv:.0f}% >= cap {cv_cap:.0f}% (unstable liquidity)"
 
     if exclude_ceiling_floor:
         if s.is_ceiling:

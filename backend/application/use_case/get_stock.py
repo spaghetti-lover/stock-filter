@@ -1,5 +1,6 @@
 from domain.repositories.stock_repository import ProgressCallback, StockRepository
 from application.mappers.stock_mapper import StockMapper
+from application.mappers.market_regime_mapper import MarketRegimeMapper
 from application.dto.stock_dto import FilteredStocksResponse, GetStockResponse
 from application.services.stock_filter import apply_filters
 
@@ -25,8 +26,25 @@ class GetStockUseCase:
         use_intraday: bool = True,
         use_volume: bool = True,
         exclude_ceiling_floor: bool = True,
+        cv_cap: float = 200.0,
+        use_cv: bool = True,
+        market_regime_gate: bool = True,
         on_progress: ProgressCallback | None = None,
     ) -> FilteredStocksResponse:
+        # --- Market Regime Gate ---
+        regime_resp = None
+        if market_regime_gate:
+            regime = await self.repo.get_market_regime()
+            regime_resp = MarketRegimeMapper.to_response(regime, gate_applied=True)
+
+            if regime is not None and regime.state == "downtrend":
+                return FilteredStocksResponse(
+                    passed=[],
+                    rejected=[],
+                    market_regime=regime_resp,
+                )
+
+        # --- Per-symbol scan ---
         min_gtgd_raw = min_gtgd * 1e9
         stocks, early_rejected = await self.repo.list_stocks(
             exchanges=exchanges,
@@ -53,6 +71,8 @@ class GetStockUseCase:
             use_intraday=use_intraday,
             use_volume=use_volume,
             exclude_ceiling_floor=exclude_ceiling_floor,
+            cv_cap=cv_cap,
+            use_cv=use_cv,
         )
 
         # Include early-rejected stocks (no history / below min_gtgd before full fetch)
@@ -70,4 +90,4 @@ class GetStockUseCase:
                 reject_reason=reason,
             ))
 
-        return FilteredStocksResponse(passed=passed, rejected=rejected)
+        return FilteredStocksResponse(passed=passed, rejected=rejected, market_regime=regime_resp)

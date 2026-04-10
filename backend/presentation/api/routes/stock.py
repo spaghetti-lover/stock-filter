@@ -33,6 +33,9 @@ async def get_stock(
     use_intraday: bool = Query(default=True),
     use_volume: bool = Query(default=True),
     exclude_ceiling_floor: bool = Query(default=True),
+    cv_cap: float = Query(default=200.0, ge=0.0, le=1000.0),
+    use_cv: bool = Query(default=True),
+    market_regime_gate: bool = Query(default=True),
     usecase: GetStockUseCase = Depends(get_usecase),
 ):
     log.info("GET /stocks exchanges=%s min_gtgd=%s statuses=%s", exchanges, min_gtgd, statuses)
@@ -53,6 +56,9 @@ async def get_stock(
             use_intraday=use_intraday,
             use_volume=use_volume,
             exclude_ceiling_floor=exclude_ceiling_floor,
+            cv_cap=cv_cap,
+            use_cv=use_cv,
+            market_regime_gate=market_regime_gate,
         )
         log.info("GET /stocks -> %d passed, %d rejected", len(result.passed), len(result.rejected))
         return result
@@ -76,6 +82,10 @@ def _stock_query_params(
     use_price: bool = Query(default=True),
     use_intraday: bool = Query(default=True),
     use_volume: bool = Query(default=True),
+    exclude_ceiling_floor: bool = Query(default=True),
+    cv_cap: float = Query(default=200.0, ge=0.0, le=1000.0),
+    use_cv: bool = Query(default=True),
+    market_regime_gate: bool = Query(default=True),
 ) -> dict:
     return dict(
         exchanges=exchanges, min_gtgd=min_gtgd, statuses=statuses,
@@ -84,6 +94,8 @@ def _stock_query_params(
         use_exchange=use_exchange, use_gtgd20=use_gtgd20, use_status=use_status,
         use_history=use_history, use_price=use_price,
         use_intraday=use_intraday, use_volume=use_volume,
+        exclude_ceiling_floor=exclude_ceiling_floor,
+        cv_cap=cv_cap, use_cv=use_cv, market_regime_gate=market_regime_gate,
     )
 
 
@@ -115,6 +127,10 @@ async def stream_stocks(
                 use_price=params["use_price"],
                 use_intraday=params["use_intraday"],
                 use_volume=params["use_volume"],
+                exclude_ceiling_floor=params["exclude_ceiling_floor"],
+                cv_cap=params["cv_cap"],
+                use_cv=params["use_cv"],
+                market_regime_gate=params["market_regime_gate"],
                 on_progress=on_progress,
             )
             payload = json.dumps({"type": "result", "data": result.model_dump()})

@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Awaitable, Callable
 
 from domain.entities.stock import Stock
+from domain.value_objects.market_regime import MarketRegime
 
 ProgressCallback = Callable[[int, int, str], Awaitable[None]]
 
@@ -18,4 +19,8 @@ class StockRepository(ABC):
         min_history_sessions: int = 0,
         on_progress: ProgressCallback | None = None,
     ) -> tuple[list[Stock], list[EarlyRejected]]:
+        pass
+
+    @abstractmethod
+    async def get_market_regime(self) -> MarketRegime | None:
         pass

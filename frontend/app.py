@@ -103,6 +103,7 @@ with st.sidebar:
 
     exclude_ceiling_floor = st.toggle("Exclude ceiling/floor stocks", value=True)
 
+    use_cv = st.toggle("CV cap (%)", value=True)
     cv_cap = st.slider(
         "Coefficient of Variation",
         min_value=0,
@@ -111,11 +112,14 @@ with st.sidebar:
         step=10,
         help=(
             "Filter out symbols with unstable trading value (GTGD) over the last 20 sessions. "
-            "High CV indicates irregular liquidity, often caused by 1–2 abnormal volume spikes "
+            "CV = std(GTGD_20) / mean(GTGD_20) x 100. "
+            "High CV indicates irregular liquidity, often caused by 1-2 abnormal volume spikes "
             "(pump-and-dump), making signals unreliable and hard to execute."
         ),
+        disabled=not use_cv,
+        label_visibility="collapsed",
     )
-    
+
     market_regime_gate = st.toggle("Apply market regime gate", value=True)
 
     st.divider()
@@ -135,6 +139,7 @@ def build_df(stocks: list[dict], include_reason: bool = False) -> pd.DataFrame:
             "Today value (B)": f"{s['today_value']/1e9:.2f}",
             "Expected by now (B)": f"{s['avg_intraday_expected']/1e9:.2f}",
             "Intraday ratio": f"{intraday_ratio*100:.0f}%" if intraday_ratio is not None else "N/A",
+            "CV (%)": f"{s['cv']:.0f}" if s.get("cv") is not None else "N/A",
         }
         if include_reason:
             row["Reject reason"] = s.get("reject_reason", "")
@@ -163,6 +168,9 @@ with tab_filter:
             "use_intraday": use_intraday,
             "use_volume": use_volume,
             "exclude_ceiling_floor": exclude_ceiling_floor,
+            "cv_cap": cv_cap,
+            "use_cv": use_cv,
+            "market_regime_gate": market_regime_gate,
         }
 
         progress_bar = st.progress(0, text="Fetching data from API…")
@@ -193,6 +201,16 @@ with tab_filter:
         if data is None:
             st.error("No result received from API.")
             st.stop()
+
+        # --- Market Regime Banner ---
+        regime = data.get("market_regime")
+        if regime:
+            if regime["state"] == "downtrend":
+                st.error(regime.get("message", "Market in downtrend — screener suspended"))
+            elif regime["state"] == "choppy":
+                st.warning(regime.get("message", "MARKET CAUTION — VN-Index in choppy range"))
+            elif regime["state"] == "unknown" and regime.get("message"):
+                st.info(regime["message"])
 
         passed = data["passed"]
         rejected = data["rejected"]
