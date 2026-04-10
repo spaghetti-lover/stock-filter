@@ -32,6 +32,7 @@ async def get_stock(
     use_price: bool = Query(default=True),
     use_intraday: bool = Query(default=True),
     use_volume: bool = Query(default=True),
+    exclude_ceiling_floor: bool = Query(default=True),
     usecase: GetStockUseCase = Depends(get_usecase),
 ):
     log.info("GET /stocks exchanges=%s min_gtgd=%s statuses=%s", exchanges, min_gtgd, statuses)
@@ -51,6 +52,7 @@ async def get_stock(
             use_price=use_price,
             use_intraday=use_intraday,
             use_volume=use_volume,
+            exclude_ceiling_floor=exclude_ceiling_floor,
         )
         log.info("GET /stocks -> %d passed, %d rejected", len(result.passed), len(result.rejected))
         return result

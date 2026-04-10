@@ -19,6 +19,7 @@ def apply_filters(
     use_price: bool = True,
     use_intraday: bool = True,
     use_volume: bool = True,
+    exclude_ceiling_floor: bool = True,
 ) -> tuple[list[GetStockResponse], list[GetStockResponse]]:
     """Filter stocks and return (passed, rejected) lists."""
     passed = []
@@ -30,7 +31,7 @@ def apply_filters(
             exchanges, min_gtgd20, allowed_statuses, min_history,
             min_price, min_intraday_ratio, min_volume,
             use_exchange, use_gtgd20, use_status, use_history,
-            use_price, use_intraday, use_volume,
+            use_price, use_intraday, use_volume, exclude_ceiling_floor,
         )
         if reason:
             rejected.append(stock.model_copy(update={"reject_reason": reason}))
@@ -56,6 +57,7 @@ def _check(
     use_price: bool,
     use_intraday: bool,
     use_volume: bool,
+    exclude_ceiling_floor: bool,
 ) -> str | None:
     """Return rejection reason string, or None if stock passes all filters."""
     if use_exchange and exchanges and s.exchange not in exchanges:
@@ -83,5 +85,11 @@ def _check(
 
     if use_volume and s.today_value < min_volume:
         return f"Volume {s.today_value / 1e6:.1f}M VND < {min_volume / 1e6:.0f}M VND"
+
+    if exclude_ceiling_floor:
+        if s.is_ceiling:
+            return "At ceiling price — full bid, not suitable for wave trading"
+        if s.is_floor:
+            return "At floor price — cannot exit, not suitable for wave trading"
 
     return None

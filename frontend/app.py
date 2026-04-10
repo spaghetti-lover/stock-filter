@@ -53,7 +53,7 @@ with st.sidebar:
     use_history = st.toggle("Min history (sessions)", value=True)
     min_history = st.number_input(
         "Min history (sessions)",
-        min_value=1,
+        min_value=20,
         max_value=500,
         value=60,
         step=5,
@@ -101,6 +101,23 @@ with st.sidebar:
         label_visibility="collapsed",
     )
 
+    exclude_ceiling_floor = st.toggle("Exclude ceiling/floor stocks", value=True)
+
+    cv_cap = st.slider(
+        "Coefficient of Variation",
+        min_value=0,
+        max_value=500,
+        value=200,
+        step=10,
+        help=(
+            "Filter out symbols with unstable trading value (GTGD) over the last 20 sessions. "
+            "High CV indicates irregular liquidity, often caused by 1–2 abnormal volume spikes "
+            "(pump-and-dump), making signals unreliable and hard to execute."
+        ),
+    )
+    
+    market_regime_gate = st.toggle("Apply market regime gate", value=True)
+
     st.divider()
     run = st.button("🔍 Filter Stocks", type="primary", use_container_width=True)
 
@@ -145,6 +162,7 @@ with tab_filter:
             "use_price": use_price,
             "use_intraday": use_intraday,
             "use_volume": use_volume,
+            "exclude_ceiling_floor": exclude_ceiling_floor,
         }
 
         progress_bar = st.progress(0, text="Fetching data from API…")

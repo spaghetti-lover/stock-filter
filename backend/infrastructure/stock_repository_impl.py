@@ -45,6 +45,25 @@ def _get_expected_fraction_at_time(hour: int, minute: int) -> float:
     return 1.0
 
 
+_BAND = {"HOSE": 0.07, "HNX": 0.10, "UPCOM": 0.15}
+_CEILING_FLOOR_TOLERANCE = 0.005  # 0.5% to handle tick-size rounding
+
+
+def _detect_ceiling_floor(exchange: str, history_rows: list[dict]) -> tuple[bool, bool]:
+    """Return (is_ceiling, is_floor) for the latest session."""
+    if len(history_rows) < 2:
+        return False, False
+    ref = history_rows[-2]["close"]
+    if not ref:
+        return False, False
+    band = _BAND.get(exchange, 0.07)
+    close = history_rows[-1]["close"]
+    ceiling = ref * (1 + band)
+    floor = ref * (1 - band)
+    is_ceiling = abs(close - ceiling) / ceiling <= _CEILING_FLOOR_TOLERANCE
+    is_floor = abs(close - floor) / floor <= _CEILING_FLOOR_TOLERANCE
+    return is_ceiling, is_floor
+
 class StockRepositoryImpl(StockRepository):
     async def list_stocks(
         self,
@@ -97,6 +116,9 @@ class StockRepositoryImpl(StockRepository):
                     else:
                         today_value = sum(r["price"] * 1000 * r["volume"] for r in intraday_rows) if intraday_rows else 0.0
                         avg_intraday_expected = gtgd20 * expected_fraction
+
+                        is_ceiling, is_floor = _detect_ceiling_floor(exchange, history_rows)
+
                         result = Stock(
                             symbol=symbol,
                             exchange=exchange,
@@ -107,6 +129,8 @@ class StockRepositoryImpl(StockRepository):
                             today_value=today_value,
                             avg_intraday_expected=avg_intraday_expected,
                             intraday_ratio=today_value / avg_intraday_expected if avg_intraday_expected > 0 else None,
+                            is_ceiling=is_ceiling,
+                            is_floor=is_floor,
                         )
 
             async with counter_lock:

@@ -24,6 +24,7 @@ class GetStockUseCase:
         use_price: bool = True,
         use_intraday: bool = True,
         use_volume: bool = True,
+        exclude_ceiling_floor: bool = True,
         on_progress: ProgressCallback | None = None,
     ) -> FilteredStocksResponse:
         min_gtgd_raw = min_gtgd * 1e9
@@ -51,6 +52,7 @@ class GetStockUseCase:
             use_price=use_price,
             use_intraday=use_intraday,
             use_volume=use_volume,
+            exclude_ceiling_floor=exclude_ceiling_floor,
         )
 
         # Include early-rejected stocks (no history / below min_gtgd before full fetch)

@@ -15,6 +15,8 @@ class StockMapper:
             today_value=stock.today_value,
             avg_intraday_expected=stock.avg_intraday_expected,
             intraday_ratio=stock.intraday_ratio,
+            is_ceiling=stock.is_ceiling,
+            is_floor=stock.is_floor,
         )
 
     @staticmethod

@@ -11,6 +11,8 @@ class GetStockResponse(BaseModel):
     today_value: float
     avg_intraday_expected: float
     intraday_ratio: float | None
+    is_ceiling: bool = False
+    is_floor: bool = False
     reject_reason: str | None = None
 
 
