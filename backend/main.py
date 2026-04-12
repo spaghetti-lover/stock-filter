@@ -7,11 +7,28 @@ load_dotenv(Path(__file__).parent / ".env")
 from logger import setup_logging, get_logger
 setup_logging(latest_only=True)
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from presentation.api.routes import stock, chat
+from db.connection import init_pool, close_pool
+from infrastructure.scheduler.scheduler import start_scheduler, stop_scheduler
+from infrastructure.container import get_crawl_usecase
 
 log = get_logger(__name__)
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await init_pool()
+    crawl_usecase = get_crawl_usecase()
+    start_scheduler(crawl_usecase.execute)
+    log.info("App started: DB pool and scheduler initialized")
+    yield
+    stop_scheduler()
+    await close_pool()
+    log.info("App shutdown: scheduler and DB pool closed")
+
+
+app = FastAPI(lifespan=lifespan)
 app.include_router(stock.router, tags=["Stock"])
 app.include_router(chat.router, tags=["Chat"])

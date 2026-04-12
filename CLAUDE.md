@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Vietnam Stock Filter — a web app that filters Vietnamese stocks (HOSE/HNX/UPCOM) using trading metrics. Fetches data live via the vnstock API (no database), exposes a FastAPI backend, and provides a Streamlit frontend.
+Vietnam Stock Filter — a web app that filters Vietnamese stocks (HOSE/HNX/UPCOM) using trading metrics. A daily crawl pipeline fetches data from the vnstock API and stores computed metrics in PostgreSQL. The FastAPI backend serves cached data for fast retrieval, with a live streaming endpoint available. Frontend is Streamlit.
 
 ## Commands
 
@@ -12,6 +12,12 @@ You must install new package with in virtual environment
 
 ```bash
 make remove_pycache # Clean __pycache__ directories
+
+# Database
+make db_start       # Start PostgreSQL container
+make db_stop        # Stop and remove PostgreSQL container
+make migrate        # Run SQL migrations
+make db_check       # Check crawled stock data in database
 
 # Backend (from repo root)
 cd backend && uv run uvicorn main:app --reload   # http://localhost:8000, docs at /docs
@@ -27,16 +33,33 @@ docker compose up -d --build
 
 Clean Architecture with four layers:
 
-- **Domain** (`backend/domain/`) — `Stock` entity, `StockRepository` interface
-- **Application** (`backend/application/`) — `GetStockUseCase`, DTOs, mappers
-- **Infrastructure** (`backend/infrastructure/`) — `StockRepositoryImpl` (live vnstock API), AI agents (Claude/Gemini/OpenAI)
-- **Presentation** (`backend/presentation/api/routes/`) — FastAPI routes: `GET /stocks`, `GET /stocks/stream`, `POST /chat`
+- **Domain** (`backend/domain/`) — `Stock` entity, `StockRepository` and `CrawlRepository` interfaces, `MarketRegime` value object
+- **Application** (`backend/application/`) — `GetStockUseCase`, `CrawlUseCase`, DTOs, mappers, stock filter service
+- **Infrastructure** (`backend/infrastructure/`) — organized into subfolders:
+  - `persistence/` — `StockRepositoryImpl` (live vnstock API), `StockRepositoryDB` (PostgreSQL), `CrawlRepositoryImpl`, `stock_metrics` (shared computation)
+  - `market_data/` — vnstock API wrappers with rate limiting
+  - `agents/` — AI agents (Claude/Gemini/OpenAI)
+  - `scheduler/` — APScheduler (daily crawl at 16:00 VN time)
+  - `container.py` — Composition root (DI wiring)
+- **Presentation** (`backend/presentation/api/routes/`) — FastAPI routes: `GET /stocks` (cached), `GET /stocks/stream` (live SSE), `POST /crawl/trigger`, `GET /crawl/status`, `POST /chat`
 
-Frontend (`frontend/`) is a Streamlit app; client-side Python (`filters.py`) handles price, status, history, intraday ratio, volume filters.
+Frontend (`frontend/`) is a Streamlit app that consumes `GET /stocks/stream` with progress bar for live data.
 
 ### Data Flow
 
-Streamlit → `GET /stocks` → `GetStockUseCase` → `StockRepositoryImpl` → vnstock API (live)
+**Cached (default):** Streamlit → `GET /stocks` → `GetStockUseCase` → `StockRepositoryDB` → PostgreSQL
+
+**Live (stream):** Streamlit → `GET /stocks/stream` (SSE) → `GetStockUseCase` → `StockRepositoryImpl` → vnstock API
+
+**Daily crawl:** APScheduler (16:00 VN) → `CrawlUseCase` → `CrawlRepositoryImpl` → vnstock API → PostgreSQL
+
+### Database
+
+PostgreSQL (`stock_data` database) with two tables:
+- `stock_metrics` — crawled stock data (symbol PK, exchange, price, gtgd20, cv, etc.)
+- `crawl_log` — crawl history (status, timing, counts)
+
+Connection pool managed by asyncpg via `backend/db/connection.py`. Migration at `backend/db/migrations/001_create_stocks.sql`.
 
 ## Environment
 
@@ -46,9 +69,10 @@ Requires `backend/.env` with:
 ANTHROPIC_API_KEY=sk-ant-...
 GOOGLE_API_KEY=AIza...
 OPENAI_API_KEY=sk-proj-...
+DATABASE_URL=postgresql://postgres:password@localhost:5432/stock_data
 ```
 
-`vnstock_data` 3.0.0 (sponsored) is installed in the project `.venv`. No database is used — all stock data is fetched live from the vnstock API.
+`vnstock_data` 3.0.0 (sponsored) is installed in the project `.venv`.
 
 ## vnstock_data API Usage (this project)
 
