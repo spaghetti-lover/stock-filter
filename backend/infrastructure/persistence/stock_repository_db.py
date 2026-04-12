@@ -1,13 +1,11 @@
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 
 from db.connection import get_pool
 from domain.entities.stock import Stock
 from domain.repositories.stock_repository import EarlyRejected, ProgressCallback, StockRepository
 from domain.value_objects.market_regime import MarketRegime
 from infrastructure.market_data.data import get_vnindex_history
-
-_executor = ThreadPoolExecutor(max_workers=5)
+from infrastructure.persistence.stock_metrics import executor, compute_market_regime
 
 
 class StockRepositoryDB(StockRepository):
@@ -56,11 +54,5 @@ class StockRepositoryDB(StockRepository):
 
     async def get_market_regime(self) -> MarketRegime | None:
         loop = asyncio.get_event_loop()
-        rows = await loop.run_in_executor(_executor, get_vnindex_history, 40)
-        if not rows or len(rows) < 20:
-            return None
-        closes = [r["close"] for r in rows]
-        vnindex_close = closes[-1]
-        ma5 = sum(closes[-5:]) / 5
-        ma20 = sum(closes[-20:]) / 20
-        return MarketRegime.from_values(close=vnindex_close, ma5=ma5, ma20=ma20)
+        rows = await loop.run_in_executor(executor, get_vnindex_history, 40)
+        return compute_market_regime(rows)

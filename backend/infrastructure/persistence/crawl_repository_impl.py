@@ -1,27 +1,24 @@
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
 from db.connection import get_pool
 from domain.entities.stock import Stock
 from domain.repositories.crawl_repository import CrawlRepository
 from infrastructure.market_data.data import get_all_symbols, get_trading_history, get_intraday
-from infrastructure.persistence.stock_metrics import compute_stock_metrics
+from infrastructure.persistence.stock_metrics import executor, CONCURRENCY, compute_stock_metrics
 from logger import get_logger
 
 log = get_logger(__name__)
 
-_executor = ThreadPoolExecutor(max_workers=30)
-_CONCURRENCY = 10
 
 class CrawlRepositoryImpl(CrawlRepository):
     async def crawl_all_stocks(self) -> list[Stock]:
         loop = asyncio.get_event_loop()
-        symbols = await loop.run_in_executor(_executor, get_all_symbols)
+        symbols = await loop.run_in_executor(executor, get_all_symbols)
         log.info("Crawl: fetching %d symbols", len(symbols))
 
         expected_fraction = 1.0  # end of day
-        sem = asyncio.Semaphore(_CONCURRENCY)
+        sem = asyncio.Semaphore(CONCURRENCY)
         total = len(symbols)
         processed = 0
         failed = 0
@@ -34,8 +31,8 @@ class CrawlRepositoryImpl(CrawlRepository):
             exchange = item["exchange"]
             async with sem:
                 try:
-                    history_fut = loop.run_in_executor(_executor, get_trading_history, symbol, 90)
-                    intraday_fut = loop.run_in_executor(_executor, get_intraday, symbol)
+                    history_fut = loop.run_in_executor(executor, get_trading_history, symbol, 90)
+                    intraday_fut = loop.run_in_executor(executor, get_intraday, symbol)
                     history_rows, intraday_rows = await asyncio.gather(history_fut, intraday_fut)
 
                     stock = compute_stock_metrics(symbol, exchange, history_rows, intraday_rows, expected_fraction)

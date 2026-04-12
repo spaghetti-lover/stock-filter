@@ -1,4 +1,49 @@
+from concurrent.futures import ThreadPoolExecutor
+
 from domain.entities.stock import Stock
+from domain.value_objects.market_regime import MarketRegime
+
+# Shared concurrency primitives for all repository implementations
+executor = ThreadPoolExecutor(max_workers=30)
+CONCURRENCY = 10
+
+# --- Intraday time fraction ---
+
+INTRADAY_TIME_SLOTS = [
+    (9, 0), (9, 30), (10, 0), (10, 30), (11, 0), (11, 30),
+    (13, 0), (13, 30), (14, 0), (14, 30), (15, 0)
+]
+INTRADAY_CUMULATIVE = [0.12, 0.22, 0.30, 0.37, 0.43, 0.48, 0.56, 0.65, 0.75, 0.86, 1.00]
+
+
+def get_expected_fraction_at_time(hour: int, minute: int) -> float:
+    if (hour, minute) < (9, 0):
+        return 0.0
+    for i, (h, m) in enumerate(INTRADAY_TIME_SLOTS):
+        if (hour, minute) <= (h, m):
+            if i == 0:
+                return INTRADAY_CUMULATIVE[0]
+            prev_h, prev_m = INTRADAY_TIME_SLOTS[i - 1]
+            elapsed = (hour * 60 + minute) - (prev_h * 60 + prev_m)
+            slot_len = (h * 60 + m) - (prev_h * 60 + prev_m)
+            ratio = elapsed / max(slot_len, 1)
+            return INTRADAY_CUMULATIVE[i - 1] + (INTRADAY_CUMULATIVE[i] - INTRADAY_CUMULATIVE[i - 1]) * ratio
+    return 1.0
+
+
+# --- Market regime ---
+
+def compute_market_regime(rows: list[dict]) -> MarketRegime | None:
+    if not rows or len(rows) < 20:
+        return None
+    closes = [r["close"] for r in rows]
+    vnindex_close = closes[-1]
+    ma5 = sum(closes[-5:]) / 5
+    ma20 = sum(closes[-20:]) / 20
+    return MarketRegime.from_values(close=vnindex_close, ma5=ma5, ma20=ma20)
+
+
+# --- Stock metrics ---
 
 _BAND = {"HOSE": 0.07, "HNX": 0.10, "UPCOM": 0.15}
 _CEILING_FLOOR_TOLERANCE = 0.005
