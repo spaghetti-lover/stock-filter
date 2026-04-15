@@ -1,7 +1,14 @@
+import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
 
 from domain.entities.stock import Stock
+from domain.repositories.stock_repository import EarlyRejected, ProgressCallback
 from domain.value_objects.market_regime import MarketRegime
+from infrastructure.market_data.data import get_all_symbols, get_trading_history, get_intraday
+from logger import get_logger
+
+log = get_logger(__name__)
 
 # Shared concurrency primitives for all repository implementations
 executor = ThreadPoolExecutor(max_workers=30)
@@ -109,3 +116,87 @@ def compute_stock_metrics(
         is_floor=is_floor,
         cv=cv,
     )
+
+
+# --- Shared helpers for live fetch and DB persistence ---
+
+async def fetch_all_stocks_live(
+    exchanges: set[str] | None = None,
+    min_gtgd: float = 0.0,
+    min_history_sessions: int = 0,
+    expected_fraction: float = 1.0,
+    on_progress: ProgressCallback | None = None,
+) -> tuple[list[Stock], list[EarlyRejected]]:
+    """Fetch all stocks from the live API, compute metrics, and return results."""
+    loop = asyncio.get_event_loop()
+    fetch_days = max(int(min_history_sessions * 365 / 252) + 15, 90)
+
+    symbols = await loop.run_in_executor(executor, get_all_symbols)
+    if exchanges:
+        symbols = [s for s in symbols if s["exchange"] in exchanges]
+    log.info("fetch_all_stocks_live: %d symbols, fraction=%.2f, fetch_days=%d", len(symbols), expected_fraction, fetch_days)
+
+    sem = asyncio.Semaphore(CONCURRENCY)
+    total = len(symbols)
+    processed_count = 0
+    counter_lock = asyncio.Lock()
+
+    async def process(item: dict) -> Stock | tuple[str, str, str]:
+        nonlocal processed_count
+        async with sem:
+            symbol = item["symbol"]
+            exchange = item["exchange"]
+            try:
+                history_fut = loop.run_in_executor(executor, get_trading_history, symbol, fetch_days)
+                intraday_fut = loop.run_in_executor(executor, get_intraday, symbol)
+                history_rows, intraday_rows = await asyncio.gather(history_fut, intraday_fut)
+
+                stock = compute_stock_metrics(symbol, exchange, history_rows, intraday_rows, expected_fraction)
+                if stock is None:
+                    result = (symbol, exchange, "No trading history available")
+                elif stock.gtgd20 < min_gtgd:
+                    result = (symbol, exchange, f"GTGD20 {stock.gtgd20 / 1e9:.1f}B < {min_gtgd / 1e9:.0f}B")
+                else:
+                    result = stock
+            except Exception:
+                log.warning("Failed to process %s", symbol, exc_info=True)
+                result = (symbol, exchange, "Failed to fetch data")
+
+        async with counter_lock:
+            processed_count += 1
+            if on_progress:
+                await on_progress(processed_count, total, symbol)
+
+        return result
+
+    raw_results = await asyncio.gather(*[process(item) for item in symbols])
+    stocks = [r for r in raw_results if isinstance(r, Stock)]
+    early_rejected = [r for r in raw_results if isinstance(r, tuple)]
+    log.info("fetch_all_stocks_live done: %d stocks, %d early-rejected", len(stocks), len(early_rejected))
+    return stocks, early_rejected
+
+
+async def save_stocks_to_db(stocks: list[Stock]) -> None:
+    """Truncate stock_metrics and batch-insert all stocks."""
+    from db.connection import get_pool
+
+    pool = get_pool()
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            await conn.execute("TRUNCATE stock_metrics")
+            now = datetime.now(tz=timezone.utc)
+            await conn.executemany(
+                """INSERT INTO stock_metrics
+                   (symbol, exchange, status, price, gtgd20, history_sessions,
+                    today_value, avg_intraday_expected, intraday_ratio,
+                    is_ceiling, is_floor, cv, crawled_at)
+                   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)""",
+                [
+                    (
+                        s.symbol, s.exchange, s.status, s.price, s.gtgd20,
+                        s.history_sessions, s.today_value, s.avg_intraday_expected,
+                        s.intraday_ratio, s.is_ceiling, s.is_floor, s.cv, now,
+                    )
+                    for s in stocks
+                ],
+            )

@@ -3,11 +3,21 @@ from application.mappers.stock_mapper import StockMapper
 from application.mappers.market_regime_mapper import MarketRegimeMapper
 from application.dto.stock_dto import FilteredStocksResponse, GetStockResponse
 from application.services.stock_filter import apply_filters
+from logger import get_logger
+
+log = get_logger(__name__)
 
 
 class GetStockUseCase:
-    def __init__(self, repo: StockRepository):
+    def __init__(
+        self,
+        repo: StockRepository,
+        fallback_repo: StockRepository | None = None,
+        save_stocks_fn=None,
+    ):
         self.repo = repo
+        self.fallback_repo = fallback_repo
+        self.save_stocks_fn = save_stocks_fn
 
     async def execute(
         self,
@@ -52,6 +62,20 @@ class GetStockUseCase:
             min_history_sessions=min_history if use_history else 0,
             on_progress=on_progress,
         )
+
+        # --- Fallback: if primary repo returned nothing, try live fetch ---
+        if not stocks and self.fallback_repo is not None:
+            log.info("Primary repo returned no data, falling back to live fetch")
+            stocks, early_rejected = await self.fallback_repo.list_stocks(
+                exchanges=exchanges,
+                min_gtgd=min_gtgd_raw,
+                min_history_sessions=min_history if use_history else 0,
+                on_progress=on_progress,
+            )
+            if stocks and self.save_stocks_fn is not None:
+                await self.save_stocks_fn(stocks)
+                log.info("Saved %d stocks to DB from fallback", len(stocks))
+
         responses = StockMapper.to_response_list(stocks)
 
         passed, rejected = apply_filters(

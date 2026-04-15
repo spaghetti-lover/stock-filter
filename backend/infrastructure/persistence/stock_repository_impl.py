@@ -4,23 +4,14 @@ from datetime import datetime, timezone, timedelta
 from domain.entities.stock import Stock
 from domain.repositories.stock_repository import EarlyRejected, ProgressCallback, StockRepository
 from domain.value_objects.market_regime import MarketRegime
-from infrastructure.market_data.data import get_all_symbols, get_trading_history, get_intraday, get_vnindex_history
+from infrastructure.market_data.data import get_vnindex_history
 from infrastructure.persistence.stock_metrics import (
-    executor, CONCURRENCY, get_expected_fraction_at_time,
-    compute_stock_metrics, compute_market_regime,
+    executor, get_expected_fraction_at_time,
+    compute_market_regime, fetch_all_stocks_live,
 )
 from logger import get_logger
 
 log = get_logger(__name__)
-
-_semaphore: asyncio.Semaphore | None = None
-
-
-def _get_semaphore() -> asyncio.Semaphore:
-    global _semaphore
-    if _semaphore is None:
-        _semaphore = asyncio.Semaphore(CONCURRENCY)
-    return _semaphore
 
 
 class StockRepositoryImpl(StockRepository):
@@ -33,56 +24,10 @@ class StockRepositoryImpl(StockRepository):
     ) -> tuple[list[Stock], list[EarlyRejected]]:
         now = datetime.now(tz=timezone(timedelta(hours=7)))
         expected_fraction = get_expected_fraction_at_time(now.hour, now.minute)
-        loop = asyncio.get_event_loop()
-
-        # Convert session count → calendar days (Vietnam ~252 trading days/year) + 15-day buffer.
-        fetch_days = max(int(min_history_sessions * 365 / 252) + 15, 90)
-        log.info("list_stocks started: exchanges=%s min_gtgd=%s fraction=%.2f fetch_days=%d", exchanges, min_gtgd, expected_fraction, fetch_days)
-
-        symbols = await loop.run_in_executor(executor, get_all_symbols)
-        if exchanges:
-            symbols = [s for s in symbols if s["exchange"] in exchanges]
-        log.info("Processing %d symbols", len(symbols))
-
-        sem = _get_semaphore()
-        total = len(symbols)
-        processed_count = 0
-        counter_lock = asyncio.Lock()
-
-        async def process(item: dict) -> Stock | tuple[str, str, str]:
-            nonlocal processed_count
-            async with sem:
-                symbol = item["symbol"]
-                exchange = item["exchange"]
-
-                log.info("Fetching data for %s (%s)", symbol, exchange)
-                history_fut = loop.run_in_executor(executor, get_trading_history, symbol, fetch_days)
-                intraday_fut = loop.run_in_executor(executor, get_intraday, symbol)
-                history_rows, intraday_rows = await asyncio.gather(history_fut, intraday_fut)
-
-                stock = compute_stock_metrics(symbol, exchange, history_rows, intraday_rows, expected_fraction)
-                if stock is None:
-                    log.debug("No history for %s, skipping", symbol)
-                    result = (symbol, exchange, "No trading history available")
-                elif stock.gtgd20 < min_gtgd:
-                    log.debug("Skipping %s: gtgd20=%.2f < min_gtgd=%.2f", symbol, stock.gtgd20, min_gtgd)
-                    result = (symbol, exchange, f"GTGD20 {stock.gtgd20 / 1e9:.1f}B < {min_gtgd / 1e9:.0f}B")
-                else:
-                    result = stock
-
-            async with counter_lock:
-                processed_count += 1
-                log.info("Progress: %d/%d — %s", processed_count, total, symbol)
-                if on_progress:
-                    await on_progress(processed_count, total, symbol)
-
-            return result
-
-        raw_results = await asyncio.gather(*[process(item) for item in symbols])
-        stocks = [r for r in raw_results if isinstance(r, Stock)]
-        early_rejected = [r for r in raw_results if isinstance(r, tuple)]
-        log.info("list_stocks done: %d stocks, %d early-rejected", len(stocks), len(early_rejected))
-        return stocks, early_rejected
+        log.info("list_stocks started: exchanges=%s min_gtgd=%s fraction=%.2f", exchanges, min_gtgd, expected_fraction)
+        return await fetch_all_stocks_live(
+            exchanges, min_gtgd, min_history_sessions, expected_fraction, on_progress,
+        )
 
     async def get_market_regime(self) -> MarketRegime | None:
         loop = asyncio.get_event_loop()
