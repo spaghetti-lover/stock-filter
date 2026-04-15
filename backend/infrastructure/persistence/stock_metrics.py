@@ -147,14 +147,17 @@ async def fetch_all_stocks_live(
             symbol = item["symbol"]
             exchange = item["exchange"]
             try:
+                log.info("Fetching %s (%s)", symbol, exchange)
                 history_fut = loop.run_in_executor(executor, get_trading_history, symbol, fetch_days)
                 intraday_fut = loop.run_in_executor(executor, get_intraday, symbol)
                 history_rows, intraday_rows = await asyncio.gather(history_fut, intraday_fut)
 
                 stock = compute_stock_metrics(symbol, exchange, history_rows, intraday_rows, expected_fraction)
                 if stock is None:
+                    log.debug("No history for %s, skipping", symbol)
                     result = (symbol, exchange, "No trading history available")
                 elif stock.gtgd20 < min_gtgd:
+                    log.debug("Skipping %s: gtgd20=%.2f < min_gtgd=%.2f", symbol, stock.gtgd20, min_gtgd)
                     result = (symbol, exchange, f"GTGD20 {stock.gtgd20 / 1e9:.1f}B < {min_gtgd / 1e9:.0f}B")
                 else:
                     result = stock
@@ -164,6 +167,7 @@ async def fetch_all_stocks_live(
 
         async with counter_lock:
             processed_count += 1
+            log.info("Progress: %d/%d — %s", processed_count, total, symbol)
             if on_progress:
                 await on_progress(processed_count, total, symbol)
 
