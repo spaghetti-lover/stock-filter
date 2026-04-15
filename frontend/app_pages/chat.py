@@ -3,6 +3,8 @@
 import requests
 import streamlit as st
 
+from config import BACKEND_URL
+
 
 # ── Sidebar: chat settings ────────────────────────────────────────────────────
 with st.sidebar:
@@ -33,7 +35,7 @@ if prompt := st.chat_input("Ask about stocks…"):
         "provider": provider,
     }
     with st.spinner("Thinking…"):
-        resp = requests.post("http://localhost:8000/chat", json=payload)
+        resp = requests.post(f"{BACKEND_URL}/chat", json=payload)
 
     if not resp.ok:
         try:

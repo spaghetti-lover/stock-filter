@@ -4,6 +4,8 @@ import requests
 import streamlit as st
 import pandas as pd
 
+from config import BACKEND_URL
+
 
 # ── Sidebar: Layer 1 filter controls ─────────────────────────────────────────
 with st.sidebar:
@@ -182,7 +184,7 @@ else:
 
     data = None
     with st.spinner("Fetching data…"):
-        resp = requests.get("http://localhost:8000/stocks", params=params)
+        resp = requests.get(f"{BACKEND_URL}/stocks", params=params)
         if not resp.ok:
             st.error(f"API error {resp.status_code}: {resp.text}")
             st.stop()

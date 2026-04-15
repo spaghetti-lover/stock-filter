@@ -5,8 +5,7 @@ import requests
 import streamlit as st
 import pandas as pd
 
-
-API_BASE = "http://localhost:8000"
+from config import BACKEND_URL
 
 
 # ── Sidebar ──────────────────────────────────────────────────────────────────
@@ -46,7 +45,7 @@ with col_c:
 def fetch_layer2_cached() -> dict | None:
     """Call GET /stocks/layer2 (cached, no progress)."""
     try:
-        resp = requests.get(f"{API_BASE}/stocks/layer2", params={"force_refresh": "false"}, timeout=30)
+        resp = requests.get(f"{BACKEND_URL}/stocks/layer2", params={"force_refresh": "false"}, timeout=30)
         if resp.status_code == 400:
             return {"error": resp.json().get("detail", "Layer 1 not run")}
         resp.raise_for_status()
@@ -60,7 +59,7 @@ def fetch_layer2_cached() -> dict | None:
 def fetch_layer2_stream(progress_bar, status_text) -> dict | None:
     """Call GET /stocks/layer2/stream (SSE with progress)."""
     try:
-        resp = requests.get(f"{API_BASE}/stocks/layer2/stream", stream=True, timeout=600)
+        resp = requests.get(f"{BACKEND_URL}/stocks/layer2/stream", stream=True, timeout=600)
         if resp.status_code == 400:
             return {"error": resp.json().get("detail", "Layer 1 not run")}
         resp.raise_for_status()
