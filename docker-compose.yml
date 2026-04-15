@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
-      POSTGRES_DB: stock_db
+      POSTGRES_DB: stock_data
     ports:
       - "5432:5432"
     volumes:
@@ -24,7 +24,7 @@ services:
     env_file:
       - backend/.env
     environment:
-      DATABASE_URL: postgresql://postgres:password@db:5432/stock_db
+      DATABASE_URL: postgresql://postgres:password@db:5432/stock_data
     volumes:
       - ~/.vnstock:/root/.vnstock:ro
     depends_on:
