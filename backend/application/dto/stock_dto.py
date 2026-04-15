@@ -33,3 +33,19 @@ class FilteredStocksResponse(BaseModel):
     passed: list[GetStockResponse]
     rejected: list[GetStockResponse]
     market_regime: MarketRegimeResponse | None = None
+
+
+class Layer2StockScore(BaseModel):
+    symbol: str
+    exchange: str
+    buy_score: float
+    liquidity_score: float
+    momentum_score: float
+    breakout_score: float
+    scored_at: str
+
+
+class Layer2Response(BaseModel):
+    scores: list[Layer2StockScore]
+    from_cache: bool
+    scored_at: str | None = None

@@ -148,6 +148,91 @@ def cal_buy_score(
     return round(buy_score(s_liquidity, s_momentum, s_breakout), 2)
 
 
+def cal_buy_score_detailed(
+    history: list[dict],
+    intraday: list[dict],
+    vnindex_history: list[dict],
+    minutes_elapsed: float,
+) -> dict:
+    """Return BUY score with sub-score breakdown.
+
+    Returns dict with keys: buy_score, liquidity, momentum, breakout.
+    Raises ValueError if history < 65 sessions.
+    """
+    if len(history) < 65:
+        raise ValueError(f"Need at least 65 sessions, got {len(history)}")
+
+    close_arr = extract_close(history)
+    high_arr  = extract_high(history)
+    low_arr   = extract_low(history)
+    vol_arr   = extract_volume(history)
+    vn_close  = extract_close(vnindex_history)
+
+    close_today = close_arr[-1]
+    avg_vol_20d = cal_avg_volume_20d(vol_arr)
+    gtgd20_val  = cal_gtgd20(close_arr, vol_arr)
+
+    gtgd_intraday   = cal_intraday_gtgd(intraday)
+    intraday_ratio_ = cal_intraday_ratio(gtgd_intraday, gtgd20_val, minutes_elapsed)
+    cv_val          = cal_cv_val(cal_gtgd_daily(close_arr, vol_arr)[-21:-1])
+
+    s_liquidity = liquidity_score(
+        gtdg20_score(gtgd20_val),
+        intraday_score(intraday_ratio_),
+        cv_score(cv_val),
+    )
+
+    composite_ret = cal_composite_return(
+        cal_return_n_days(close_today, close_arr[-2]),
+        cal_return_n_days(close_today, close_arr[-6]),
+        cal_return_n_days(close_today, close_arr[-21]),
+    )
+    ma20_today  = cal_ma(close_arr, 20)
+    ma50_today  = cal_ma(close_arr, 50)
+    ma20_5d_ago = cal_ma_n_days_ago(close_arr, 20, 5)
+
+    s_momentum = momentum_score(
+        price_volatility_score(composite_ret),
+        ma_score(
+            cal_price_vs_ma(close_today, ma20_today),
+            cal_price_vs_ma(close_today, ma50_today),
+            cal_slope_pct(ma20_today, ma20_5d_ago),
+        ),
+        rs_score(cal_rs_weighted_from_history(close_arr, vn_close)),
+        ad_score(cal_ad_ratio(close_arr[-21:], vol_arr[-21:])),
+        technical_confirmation_score(
+            cal_rsi(close_arr),
+            cal_macd_histogram(close_arr, close_today),
+        ),
+    )
+
+    high20_val    = cal_high_20_sessions(high_arr[-21:])
+    b_ratio       = cal_breakout_ratio(close_today, high20_val)
+    vol_ratio_val = cal_volume_ratio(
+        cal_intraday_volume(intraday),
+        cal_volume_expected(avg_vol_20d, minutes_elapsed),
+    )
+
+    s_breakout = breakout_score(
+        price_breakout_score(b_ratio),
+        volume_confirmation_score(vol_ratio_val),
+        volume_dryup_score(cal_dry_up_ratio(cal_pre_vol_avg(vol_arr), avg_vol_20d)),
+        base_quality_score(cal_narrowing_ratio(
+            cal_atr_n_days(high_arr, low_arr, 5),
+            cal_atr_n_days(high_arr, low_arr, 20),
+        )),
+        holding_score(cal_holding_ratio_intraday(intraday, high20_val)),
+        b_ratio,
+    )
+
+    return {
+        "buy_score": round(buy_score(s_liquidity, s_momentum, s_breakout), 2),
+        "liquidity": round(s_liquidity, 2),
+        "momentum": round(s_momentum, 2),
+        "breakout": round(s_breakout, 2),
+    }
+
+
 # Buy Score
 """
 BUY Score = 0.35 × Điểm Thanh khoản + 0.30 × Điểm Động lượng + 0.35 × Điểm Breakout

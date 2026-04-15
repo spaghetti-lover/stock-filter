@@ -1,4 +1,5 @@
 from domain.repositories.stock_repository import ProgressCallback, StockRepository
+from domain.repositories.layer1_repository import Layer1ResultRepository
 from application.mappers.stock_mapper import StockMapper
 from application.mappers.market_regime_mapper import MarketRegimeMapper
 from application.dto.stock_dto import FilteredStocksResponse, GetStockResponse
@@ -14,10 +15,12 @@ class GetStockUseCase:
         repo: StockRepository,
         fallback_repo: StockRepository | None = None,
         save_stocks_fn=None,
+        layer1_repo: Layer1ResultRepository | None = None,
     ):
         self.repo = repo
         self.fallback_repo = fallback_repo
         self.save_stocks_fn = save_stocks_fn
+        self.layer1_repo = layer1_repo
 
     async def execute(
         self,
@@ -113,5 +116,15 @@ class GetStockUseCase:
                 intraday_ratio=None,
                 reject_reason=reason,
             ))
+
+        # --- Persist Layer 1 results to DB ---
+        if self.layer1_repo is not None:
+            try:
+                await self.layer1_repo.save_results(
+                    [s.model_dump() for s in passed],
+                    [s.model_dump() for s in rejected],
+                )
+            except Exception:
+                log.warning("Failed to persist layer1 results", exc_info=True)
 
         return FilteredStocksResponse(passed=passed, rejected=rejected, market_regime=regime_resp)

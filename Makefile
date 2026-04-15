@@ -17,6 +17,7 @@ db_stop:
 
 migrate:
 	psql "postgresql://postgres:password@localhost:5432/stock_data" -f backend/db/migrations/001_create_stocks.sql
+	psql "postgresql://postgres:password@localhost:5432/stock_data" -f backend/db/migrations/002_create_layer_tables.sql
 
 db_check:
 	psql "postgresql://postgres:password@localhost:5432/stock_data" -c "SELECT count(*) AS total_stocks FROM stock_metrics;" -c "SELECT symbol, exchange, price, gtgd20, crawled_at FROM stock_metrics LIMIT 10;" -c "SELECT * FROM crawl_log ORDER BY id DESC LIMIT 5;"

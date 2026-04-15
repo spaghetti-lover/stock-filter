@@ -1,29 +1,31 @@
 """Layer 2 — BUY score page."""
 
+import json
+import requests
 import streamlit as st
 import pandas as pd
 
 
-# ── Sidebar: Layer 2 controls ────────────────────────────────────────────────
+API_BASE = "http://localhost:8000"
+
+
+# ── Sidebar ──────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.header("Layer 2 settings", anchor=False)
-
-    min_buy_score = st.slider(
-        "Min BUY score",
-        min_value=0,
-        max_value=100,
-        value=50,
-        step=5,
-        help="Only show stocks with BUY score >= this threshold.",
-    )
     st.caption(
         "BUY score = 35% Liquidity + 30% Momentum + 35% Breakout. "
         "Scores stocks that passed Layer 1 on breakout quality."
     )
+    refresh = st.button(
+        "Refresh scores",
+        type="secondary",
+        use_container_width=True,
+        icon=":material/refresh:",
+        help="Re-fetch live market data and recompute all BUY scores.",
+    )
 
 
-# ── Scoring methodology ──────────────────────────────────────────────────────
-
+# ── Scoring methodology ─────────────────────────────────────────────────────
 col_a, col_b, col_c = st.columns(3)
 with col_a:
     with st.container(border=True):
@@ -39,46 +41,142 @@ with col_c:
         st.caption("Price breakout · Volume confirm · Dry-up · Base quality · Holding ratio")
 
 
-# ── Main content ──────────────────────────────────────────────────────────────
+# ── Helpers ──────────────────────────────────────────────────────────────────
 
-passed_stocks = st.session_state.get("passed_stocks")
+def fetch_layer2_cached() -> dict | None:
+    """Call GET /stocks/layer2 (cached, no progress)."""
+    try:
+        resp = requests.get(f"{API_BASE}/stocks/layer2", params={"force_refresh": "false"}, timeout=30)
+        if resp.status_code == 400:
+            return {"error": resp.json().get("detail", "Layer 1 not run")}
+        resp.raise_for_status()
+        return resp.json()
+    except requests.exceptions.ConnectionError:
+        return {"error": "Cannot connect to backend. Is the server running?"}
+    except Exception as e:
+        return {"error": str(e)}
 
-if not passed_stocks:
-    st.info(
-        "Run **Layer 1** filters first. Layer 2 scores the stocks that pass the hard filters.",
-        icon=":material/layers:",
-    )
-else:
-    st.caption(
-        f"{len(passed_stocks)} stocks passed Layer 1. "
-        f"Showing BUY score breakdown (min score: {min_buy_score})."
-    )
 
-    # Placeholder: Layer 2 API not yet wired
-    st.warning(
-        "Layer 2 scoring endpoint is not yet available. "
-        "The BUY score computation (`cal_buy_score`) is implemented but not exposed via the API. "
-        "Once connected, this page will show scored and ranked results.",
-        icon=":material/construction:",
-    )
+def fetch_layer2_stream(progress_bar, status_text) -> dict | None:
+    """Call GET /stocks/layer2/stream (SSE with progress)."""
+    try:
+        resp = requests.get(f"{API_BASE}/stocks/layer2/stream", stream=True, timeout=600)
+        if resp.status_code == 400:
+            return {"error": resp.json().get("detail", "Layer 1 not run")}
+        resp.raise_for_status()
 
-    # Preview table with passed stocks (no scores yet)
-    st.subheader("Layer 1 passed stocks (scores pending)", anchor=False)
-    preview_rows = []
-    for s in passed_stocks:
-        preview_rows.append({
+        for line in resp.iter_lines(decode_unicode=True):
+            if not line or not line.startswith("data: "):
+                continue
+            payload = json.loads(line[6:])
+            msg_type = payload.get("type")
+
+            if msg_type == "progress":
+                processed = payload["processed"]
+                total = payload["total"]
+                symbol = payload["symbol"]
+                pct = processed / total if total > 0 else 0
+                progress_bar.progress(pct, text=f"Scoring {processed}/{total} — {symbol}")
+
+            elif msg_type == "result":
+                progress_bar.progress(1.0, text="Done")
+                return payload["data"]
+
+            elif msg_type == "error":
+                return {"error": payload.get("detail", "Unknown error")}
+
+        return {"error": "Stream ended without result"}
+    except requests.exceptions.ConnectionError:
+        return {"error": "Cannot connect to backend. Is the server running?"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def render_scores(data: dict):
+    """Render the scored stocks table and metadata."""
+    scores = data.get("scores", [])
+    from_cache = data.get("from_cache", False)
+    scored_at = data.get("scored_at")
+
+    if not scores:
+        st.warning("No stocks could be scored. Check Layer 1 results.", icon=":material/warning:")
+        return
+
+    # KPI row
+    with st.container(horizontal=True):
+        st.metric("Total scored", len(scores), border=True)
+
+    # Metadata
+    meta_parts = []
+    if scored_at:
+        meta_parts.append(f"Scored at: `{scored_at[:19]}`")
+    if from_cache:
+        meta_parts.append(":material/cached: Served from cache")
+    else:
+        meta_parts.append(":material/cloud_download: Freshly computed")
+    st.caption(" · ".join(meta_parts))
+
+    # Build dataframe
+    rows = []
+    for s in scores:
+        rows.append({
             "Symbol": s["symbol"],
             "Exchange": s["exchange"],
-            "Liquidity": "—",
-            "Momentum": "—",
-            "Breakout": "—",
-            "BUY score": "—",
+            "BUY Score": s["buy_score"],
+            "Liquidity": s["liquidity_score"],
+            "Momentum": s["momentum_score"],
+            "Breakout": s["breakout_score"],
         })
+
+    df = pd.DataFrame(rows)
+
+    st.subheader(f"Scored stocks ({len(scores)})", anchor=False)
     st.dataframe(
-        pd.DataFrame(preview_rows),
+        df,
         use_container_width=True,
         hide_index=True,
         column_config={
             "Symbol": st.column_config.TextColumn(pinned=True),
+            "BUY Score": st.column_config.ProgressColumn(
+                "BUY Score",
+                min_value=0,
+                max_value=100,
+                format="%.1f",
+            ),
+            "Liquidity": st.column_config.NumberColumn(format="%.1f"),
+            "Momentum": st.column_config.NumberColumn(format="%.1f"),
+            "Breakout": st.column_config.NumberColumn(format="%.1f"),
         },
     )
+
+
+# ── Main content ─────────────────────────────────────────────────────────────
+
+if refresh:
+    # Use SSE streaming with progress bar
+    progress_bar = st.progress(0, text="Starting Layer 2 scoring...")
+    status_text = st.empty()
+    data = fetch_layer2_stream(progress_bar, status_text)
+    progress_bar.empty()
+else:
+    # Use cached endpoint (instant)
+    with st.spinner("Loading scores..."):
+        data = fetch_layer2_cached()
+
+if data is None:
+    st.error("Unexpected error fetching scores.", icon=":material/error:")
+    st.stop()
+
+if "error" in data:
+    error_msg = data["error"]
+    if "Layer 1" in error_msg:
+        st.info(
+            "Run **Layer 1** hard filters first. "
+            "Layer 2 scores the stocks that pass the hard filters.",
+            icon=":material/layers:",
+        )
+    else:
+        st.error(error_msg, icon=":material/error:")
+    st.stop()
+
+render_scores(data)

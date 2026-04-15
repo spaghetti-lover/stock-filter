@@ -3,8 +3,9 @@ import json
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from application.dto.stock_dto import FilteredStocksResponse
-from infrastructure.container import get_live_stock_usecase, get_cached_stock_usecase, get_crawl_usecase
+from application.dto.stock_dto import FilteredStocksResponse, Layer2Response
+from application.use_case.layer2_use_case import Layer1NotRunError
+from infrastructure.container import get_live_stock_usecase, get_cached_stock_usecase, get_crawl_usecase, get_layer2_usecase
 from logger import get_logger
 
 log = get_logger(__name__)
@@ -116,6 +117,59 @@ async def stream_stocks(
             payload = json.dumps({"type": "result", "data": result.model_dump()})
             await queue.put(f"data: {payload}\n\n")
         except Exception as e:
+            error = json.dumps({"type": "error", "detail": str(e)})
+            await queue.put(f"data: {error}\n\n")
+        finally:
+            await queue.put(None)
+
+    async def event_generator():
+        task = asyncio.create_task(run())
+        while True:
+            item = await queue.get()
+            if item is None:
+                break
+            yield item
+        await task
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@router.get("/stocks/layer2", response_model=Layer2Response)
+async def get_layer2_scores(
+    force_refresh: bool = Query(default=False),
+):
+    usecase = get_layer2_usecase()
+    try:
+        result = await usecase.execute(force_refresh=force_refresh)
+        log.info("GET /stocks/layer2 -> %d scores, from_cache=%s", len(result.scores), result.from_cache)
+        return result
+    except Layer1NotRunError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        log.error("GET /stocks/layer2 failed", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/stocks/layer2/stream")
+async def stream_layer2_scores():
+    """SSE endpoint for Layer 2 scoring with progress updates."""
+    usecase = get_layer2_usecase()
+    queue: asyncio.Queue[str | None] = asyncio.Queue()
+
+    async def on_progress(processed: int, total: int, symbol: str) -> None:
+        event = json.dumps({"type": "progress", "processed": processed, "total": total, "symbol": symbol})
+        await queue.put(f"data: {event}\n\n")
+
+    async def run() -> None:
+        try:
+            result = await usecase.execute(force_refresh=True, on_progress=on_progress)
+            payload = json.dumps({"type": "result", "data": result.model_dump()})
+            await queue.put(f"data: {payload}\n\n")
+        except Layer1NotRunError as e:
+            error = json.dumps({"type": "error", "detail": str(e)})
+            await queue.put(f"data: {error}\n\n")
+        except Exception as e:
+            log.error("GET /stocks/layer2/stream failed", exc_info=True)
             error = json.dumps({"type": "error", "detail": str(e)})
             await queue.put(f"data: {error}\n\n")
         finally:
