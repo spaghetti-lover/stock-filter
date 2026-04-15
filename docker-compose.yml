@@ -24,7 +24,7 @@ services:
     env_file:
       - backend/.env
     environment:
-      DATABASE_URL: postgresql://postgres:password@db:5432/stock_data
+      DATABASE_URL: postgresql://postgres:password@db:5432/stock_db
     volumes:
       - ~/.vnstock:/root/.vnstock:ro
     depends_on:
