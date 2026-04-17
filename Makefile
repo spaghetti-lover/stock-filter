@@ -1,8 +1,11 @@
-.PHONY: remove_pycache db_start db_stop migrate db_check frontend backend
+.PHONY: remove_pycache db_start db_stop migrate db_check frontend backend db_clear_all
 
 remove_pycache:
 	find . -type d -name "__pycache__" -exec rm -r {} +
 
+db_clear_all:
+	psql "postgresql://postgres:password@localhost:5432/stock_data" -c "TRUNCATE TABLE stock_metrics, crawl_log, layer1_results, layer2_scores RESTART IDENTITY CASCADE;"
+	
 db_start:
 	docker run -d \
 		--name stock_db \
