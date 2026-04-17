@@ -1,4 +1,14 @@
 import statistics
+from dataclasses import dataclass
+
+
+@dataclass
+class BuyScoreResult:
+    buy_score: float
+    liquidity_score: float
+    momentum_score: float
+    breakout_score: float
+
 
 # ---------------------------------------------------------------------------
 # Data extraction helpers
@@ -71,7 +81,7 @@ def cal_buy_score(
     intraday: list[dict],        # get_intraday() — today's ticks: {time, price, volume}
     vnindex_history: list[dict], # get_vnindex_history() — same shape as history
     minutes_elapsed: float,      # trading minutes elapsed today (caller computes)
-) -> float:
+) -> BuyScoreResult:
     """
     Compute Layer 2 BUY score from raw market data.
     Raises ValueError if history is too short (< 65 sessions including today).
@@ -145,7 +155,12 @@ def cal_buy_score(
         b_ratio,
     )
 
-    return round(buy_score(s_liquidity, s_momentum, s_breakout), 2)
+    return BuyScoreResult(
+        buy_score=round(buy_score(s_liquidity, s_momentum, s_breakout), 2),
+        liquidity_score=round(s_liquidity, 2),
+        momentum_score=round(s_momentum, 2),
+        breakout_score=round(s_breakout, 2),
+    )
 
 
 # Buy Score

@@ -83,7 +83,7 @@ async def stream_layer1(
     use_cv: bool = Query(default=True),
     market_regime_gate: bool = Query(default=True),
 ):
-    usecase = get_live_layer1_usecase()
+    usecase = get_live_layer1_usecase(save=True)
     queue: asyncio.Queue[str | None] = asyncio.Queue()
 
     async def on_progress(processed: int, total: int, symbol: str) -> None:

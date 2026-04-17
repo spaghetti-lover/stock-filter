@@ -72,9 +72,6 @@ class Layer1UseCase:
                 min_history_sessions=min_history if use_history else 0,
                 on_progress=on_progress,
             )
-            if stocks and self.save_stocks_fn is not None:
-                await self.save_stocks_fn(stocks)
-                log.info("Saved %d stocks to DB from fallback", len(stocks))
 
         responses = StockMapper.to_response_list(stocks)
 
@@ -113,5 +110,11 @@ class Layer1UseCase:
                 intraday_ratio=None,
                 reject_reason=reason,
             ))
+
+        # Persist all stocks with passed flag for Layer 2 handoff
+        if stocks and self.save_stocks_fn is not None:
+            passed_symbols = {s.symbol for s in passed}
+            await self.save_stocks_fn(stocks, passed_symbols)
+            log.info("Saved %d stocks to DB (%d passed)", len(stocks), len(passed_symbols))
 
         return FilteredStocksResponse(passed=passed, rejected=rejected, market_regime=regime_resp)

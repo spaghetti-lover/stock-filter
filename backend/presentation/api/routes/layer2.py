@@ -1,41 +1,47 @@
-from fastapi import APIRouter
-from pydantic import BaseModel
+import asyncio
+import json
+
+from fastapi import APIRouter, Query
+from fastapi.responses import StreamingResponse
+from infrastructure.container import get_layer2_usecase
 from logger import get_logger
 
 log = get_logger(__name__)
 router = APIRouter()
 
 
-class Layer2ScoreItem(BaseModel):
-    symbol: str
-    exchange: str
-    buy_score: float
-    liquidity_score: float
-    momentum_score: float
-    breakout_score: float
+@router.get("/layer2/stream")
+async def stream_layer2(refresh: bool = Query(default=False)):
+    """Stream Layer 2 BUY score computation with progress events (SSE)."""
+    usecase = get_layer2_usecase()
+    queue: asyncio.Queue[str | None] = asyncio.Queue()
 
+    async def on_progress(processed: int, total: int, symbol: str) -> None:
+        event = json.dumps({"type": "progress", "processed": processed, "total": total, "symbol": symbol})
+        await queue.put(f"data: {event}\n\n")
 
-class Layer2Response(BaseModel):
-    scores: list[Layer2ScoreItem]
-    from_cache: bool = False
-    scored_at: str | None = None
+    async def run() -> None:
+        try:
+            result = await usecase.execute(refresh=refresh, on_progress=on_progress)
+            payload = json.dumps({"type": "result", "data": result})
+            await queue.put(f"data: {payload}\n\n")
+        except ValueError as e:
+            error = json.dumps({"type": "error", "code": 422, "detail": str(e)})
+            await queue.put(f"data: {error}\n\n")
+        except Exception as e:
+            log.error("stream_layer2 failed", exc_info=True)
+            error = json.dumps({"type": "error", "code": 500, "detail": str(e)})
+            await queue.put(f"data: {error}\n\n")
+        finally:
+            await queue.put(None)
 
+    async def event_generator():
+        task = asyncio.create_task(run())
+        while True:
+            item = await queue.get()
+            if item is None:
+                break
+            yield item
+        await task
 
-@router.get("/layer2", response_model=Layer2Response)
-async def get_layer2():
-    """Stub endpoint — returns fake data. Will be implemented later."""
-    log.info("GET /layer2 (stub)")
-    return Layer2Response(
-        scores=[
-            Layer2ScoreItem(
-                symbol="FAKE",
-                exchange="HOSE",
-                buy_score=0.0,
-                liquidity_score=0.0,
-                momentum_score=0.0,
-                breakout_score=0.0,
-            ),
-        ],
-        from_cache=False,
-        scored_at=None,
-    )
+    return StreamingResponse(event_generator(), media_type="text/event-stream")

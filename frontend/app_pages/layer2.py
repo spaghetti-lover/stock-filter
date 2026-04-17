@@ -1,6 +1,8 @@
 """Layer 2 — BUY score page."""
 
+import json
 import requests
+import sseclient
 import streamlit as st
 import pandas as pd
 
@@ -41,9 +43,7 @@ with col_c:
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
-
 def render_scores(data: dict):
-    """Render the scored stocks table and metadata."""
     scores = data.get("scores", [])
     from_cache = data.get("from_cache", False)
     scored_at = data.get("scored_at")
@@ -52,11 +52,9 @@ def render_scores(data: dict):
         st.warning("No stocks could be scored. Check Layer 1 results.", icon=":material/warning:")
         return
 
-    # KPI row
     with st.container(horizontal=True):
         st.metric("Total scored", len(scores), border=True)
 
-    # Metadata
     meta_parts = []
     if scored_at:
         meta_parts.append(f"Scored at: `{scored_at[:19]}`")
@@ -66,18 +64,17 @@ def render_scores(data: dict):
         meta_parts.append(":material/cloud_download: Freshly computed")
     st.caption(" · ".join(meta_parts))
 
-    # Build dataframe
-    rows = []
-    for s in scores:
-        rows.append({
+    rows = [
+        {
             "Symbol": s["symbol"],
             "Exchange": s["exchange"],
             "BUY Score": s["buy_score"],
             "Liquidity": s["liquidity_score"],
             "Momentum": s["momentum_score"],
             "Breakout": s["breakout_score"],
-        })
-
+        }
+        for s in scores
+    ]
     df = pd.DataFrame(rows)
 
     st.subheader(f"Scored stocks ({len(scores)})", anchor=False)
@@ -100,23 +97,67 @@ def render_scores(data: dict):
     )
 
 
-# ── Main content ─────────────────────────────────────────────────────────────
+def stream_layer2(use_refresh: bool) -> dict | None:
+    """Call /layer2/stream via SSE, show progress, return final result dict."""
+    progress_bar = st.progress(0, text="Starting scoring...")
+    status_text = st.empty()
 
-data = None
-with st.spinner("Loading scores..."):
     try:
-        resp = requests.get(f"{API_BASE}/layer2")
-        if resp.ok:
-            data = resp.json()
-        else:
+        resp = requests.get(
+            f"{API_BASE}/layer2/stream",
+            params={"refresh": "true" if use_refresh else "false"},
+            stream=True,
+            headers={"Accept": "text/event-stream"},
+        )
+        if not resp.ok:
             st.error(f"API error {resp.status_code}: {resp.text}")
-            st.stop()
+            return None
+
+        client = sseclient.SSEClient(resp.iter_content(chunk_size=None))
+        result = None
+
+        for event in client.events():
+            payload = json.loads(event.data)
+            event_type = payload.get("type")
+
+            if event_type == "progress":
+                processed = payload["processed"]
+                total = payload["total"]
+                symbol = payload["symbol"]
+                pct = processed / total if total > 0 else 0
+                progress_bar.progress(pct, text=f"Scoring {symbol} ({processed}/{total})")
+
+            elif event_type == "result":
+                result = payload["data"]
+
+            elif event_type == "error":
+                progress_bar.empty()
+                status_text.empty()
+                code = payload.get("code", 500)
+                detail = payload.get("detail", "Unknown error")
+                if code == 422:
+                    st.warning(
+                        f"{detail}\n\nPlease go to **Layer 1** and run the filter first.",
+                        icon=":material/filter_alt:",
+                    )
+                else:
+                    st.error(f"Error: {detail}")
+                return None
+
+        progress_bar.empty()
+        status_text.empty()
+        return result
+
     except requests.ConnectionError:
         st.error("Cannot connect to backend. Is the server running?")
-        st.stop()
+        return None
+
+
+# ── Main content ─────────────────────────────────────────────────────────────
+
+data = stream_layer2(use_refresh=refresh)
 
 if data is None:
-    st.error("Unexpected error fetching scores.", icon=":material/error:")
     st.stop()
 
 render_scores(data)

@@ -1,9 +1,13 @@
-"""Layer 1 — Hard filters page."""
+"""Layer 1 — Hard filters page (live streaming)."""
 
+import json
 import requests
+import sseclient
 import streamlit as st
 import pandas as pd
 
+
+API_BASE = "http://localhost:8000"
 
 # ── Sidebar: Layer 1 filter controls ─────────────────────────────────────────
 with st.sidebar:
@@ -151,6 +155,52 @@ def render_market_regime(regime: dict | None):
         st.info(msg, icon=":material/help:")
 
 
+def stream_layer1(params: dict) -> dict | None:
+    """Call /layer1/stream via SSE, show progress, return final result."""
+    progress_bar = st.progress(0, text="Starting scan...")
+    status_text = st.empty()
+
+    try:
+        resp = requests.get(
+            f"{API_BASE}/layer1/stream",
+            params=params,
+            stream=True,
+            headers={"Accept": "text/event-stream"},
+        )
+        if not resp.ok:
+            st.error(f"API error {resp.status_code}: {resp.text}")
+            return None
+
+        client = sseclient.SSEClient(resp.iter_content(chunk_size=None))
+        result = None
+
+        for event in client.events():
+            payload = json.loads(event.data)
+            event_type = payload.get("type")
+
+            if event_type == "progress":
+                processed = payload["processed"]
+                total = payload["total"]
+                symbol = payload["symbol"]
+                pct = processed / total if total > 0 else 0
+                progress_bar.progress(pct, text=f"Scanning {symbol} ({processed}/{total})")
+
+            elif event_type == "result":
+                result = payload["data"]
+
+            elif event_type == "error":
+                st.error(f"Streaming error: {payload.get('detail', 'Unknown error')}")
+                return None
+
+        progress_bar.empty()
+        status_text.empty()
+        return result
+
+    except requests.ConnectionError:
+        st.error("Cannot connect to backend. Is the server running?")
+        return None
+
+
 # ── Main content ──────────────────────────────────────────────────────────────
 
 if not run:
@@ -180,13 +230,7 @@ else:
         "market_regime_gate": market_regime_gate,
     }
 
-    data = None
-    with st.spinner("Fetching data…"):
-        resp = requests.get("http://localhost:8000/layer1", params=params)
-        if not resp.ok:
-            st.error(f"API error {resp.status_code}: {resp.text}")
-            st.stop()
-        data = resp.json()
+    data = stream_layer1(params)
 
     if data is None:
         st.error("No result received from API.")
