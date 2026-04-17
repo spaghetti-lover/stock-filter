@@ -1,4 +1,4 @@
-from domain.repositories.stock_repository import ProgressCallback, StockRepository
+from domain.repositories.layer1_stock_repository import ProgressCallback, Layer1StockRepository
 from application.mappers.stock_mapper import StockMapper
 from application.mappers.market_regime_mapper import MarketRegimeMapper
 from application.dto.stock_dto import FilteredStocksResponse, GetStockResponse
@@ -8,11 +8,11 @@ from logger import get_logger
 log = get_logger(__name__)
 
 
-class GetStockUseCase:
+class Layer1UseCase:
     def __init__(
         self,
-        repo: StockRepository,
-        fallback_repo: StockRepository | None = None,
+        repo: Layer1StockRepository,
+        fallback_repo: Layer1StockRepository | None = None,
         save_stocks_fn=None,
     ):
         self.repo = repo

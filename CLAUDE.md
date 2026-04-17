@@ -33,23 +33,23 @@ docker compose up -d --build
 
 Clean Architecture with four layers:
 
-- **Domain** (`backend/domain/`) — `Stock` entity, `StockRepository` and `CrawlRepository` interfaces, `MarketRegime` value object
-- **Application** (`backend/application/`) — `GetStockUseCase`, `CrawlUseCase`, DTOs, mappers, stock filter service
+- **Domain** (`backend/domain/`) — `Stock` entity, `Layer1StockRepository` and `CrawlRepository` interfaces, `MarketRegime` value object
+- **Application** (`backend/application/`) — `Layer1UseCase`, `CrawlUseCase`, DTOs, mappers, stock filter service
 - **Infrastructure** (`backend/infrastructure/`) — organized into subfolders:
-  - `persistence/` — `StockRepositoryImpl` (live vnstock API), `StockRepositoryDB` (PostgreSQL), `CrawlRepositoryImpl`, `stock_metrics` (shared computation)
+  - `persistence/` — `Layer1StockRepositoryImpl` (live vnstock API), `Layer1StockRepositoryDB` (PostgreSQL), `CrawlRepositoryImpl`, `stock_metrics` (shared computation)
   - `market_data/` — vnstock API wrappers with rate limiting
   - `agents/` — AI agents (Claude/Gemini/OpenAI)
   - `scheduler/` — APScheduler (daily crawl at 16:00 VN time)
   - `container.py` — Composition root (DI wiring)
-- **Presentation** (`backend/presentation/api/routes/`) — FastAPI routes: `GET /stocks` (cached), `GET /stocks/stream` (live SSE), `POST /crawl/trigger`, `GET /crawl/status`, `POST /chat`
+- **Presentation** (`backend/presentation/api/routes/`) — FastAPI routes: `GET /layer1` (cached), `GET /layer1/stream` (live SSE), `GET /layer2` (stub), `POST /crawl/trigger`, `GET /crawl/status`, `POST /chat`
 
-Frontend (`frontend/`) is a Streamlit app that consumes `GET /stocks/stream` with progress bar for live data.
+Frontend (`frontend/`) is a Streamlit app that consumes the Layer 1 and Layer 2 endpoints.
 
 ### Data Flow
 
-**Cached (default):** Streamlit → `GET /stocks` → `GetStockUseCase` → `StockRepositoryDB` → PostgreSQL
+**Cached (default):** Streamlit → `GET /layer1` → `Layer1UseCase` → `Layer1StockRepositoryDB` → PostgreSQL
 
-**Live (stream):** Streamlit → `GET /stocks/stream` (SSE) → `GetStockUseCase` → `StockRepositoryImpl` → vnstock API
+**Live (stream):** Streamlit → `GET /layer1/stream` (SSE) → `Layer1UseCase` → `Layer1StockRepositoryImpl` → vnstock API
 
 **Daily crawl:** APScheduler (16:00 VN) → `CrawlUseCase` → `CrawlRepositoryImpl` → vnstock API → PostgreSQL
 

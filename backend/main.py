@@ -9,7 +9,7 @@ setup_logging(latest_only=True)
 
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from presentation.api.routes import stock, chat
+from presentation.api.routes import layer1, layer2, chat
 from db.connection import init_pool, close_pool
 from infrastructure.scheduler.scheduler import start_scheduler, stop_scheduler
 from infrastructure.container import get_crawl_usecase
@@ -30,5 +30,6 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
-app.include_router(stock.router, tags=["Stock"])
+app.include_router(layer1.router, tags=["Layer 1"])
+app.include_router(layer2.router, tags=["Layer 2"])
 app.include_router(chat.router, tags=["Chat"])

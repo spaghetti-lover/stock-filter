@@ -4,15 +4,15 @@ import json
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from application.dto.stock_dto import FilteredStocksResponse
-from infrastructure.container import get_live_stock_usecase, get_cached_stock_usecase, get_crawl_usecase
+from infrastructure.container import get_live_layer1_usecase, get_cached_layer1_usecase, get_crawl_usecase
 from logger import get_logger
 
 log = get_logger(__name__)
 router = APIRouter()
 
 
-@router.get("/stocks", response_model=FilteredStocksResponse)
-async def get_stock(
+@router.get("/layer1", response_model=FilteredStocksResponse)
+async def get_layer1(
     exchanges: list[str] = Query(default=["HOSE", "HNX", "UPCOM"]),
     min_gtgd: float = Query(default=0.0, ge=0.0),
     statuses: list[str] | None = Query(default=None),
@@ -32,8 +32,8 @@ async def get_stock(
     use_cv: bool = Query(default=True),
     market_regime_gate: bool = Query(default=True),
 ):
-    usecase = get_cached_stock_usecase()
-    log.info("GET /stocks exchanges=%s min_gtgd=%s", exchanges, min_gtgd)
+    usecase = get_cached_layer1_usecase()
+    log.info("GET /layer1 exchanges=%s min_gtgd=%s", exchanges, min_gtgd)
     try:
         result = await usecase.execute(
             exchanges=set(exchanges),
@@ -55,15 +55,15 @@ async def get_stock(
             use_cv=use_cv,
             market_regime_gate=market_regime_gate,
         )
-        log.info("GET /stocks -> %d passed, %d rejected", len(result.passed), len(result.rejected))
+        log.info("GET /layer1 -> %d passed, %d rejected", len(result.passed), len(result.rejected))
         return result
     except Exception as e:
-        log.error("GET /stocks failed", exc_info=True)
+        log.error("GET /layer1 failed", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/stocks/stream")
-async def stream_stocks(
+@router.get("/layer1/stream")
+async def stream_layer1(
     exchanges: list[str] = Query(default=["HOSE", "HNX", "UPCOM"]),
     min_gtgd: float = Query(default=0.0, ge=0.0),
     statuses: list[str] | None = Query(default=None),
@@ -83,7 +83,7 @@ async def stream_stocks(
     use_cv: bool = Query(default=True),
     market_regime_gate: bool = Query(default=True),
 ):
-    usecase = get_live_stock_usecase()
+    usecase = get_live_layer1_usecase()
     queue: asyncio.Queue[str | None] = asyncio.Queue()
 
     async def on_progress(processed: int, total: int, symbol: str) -> None:

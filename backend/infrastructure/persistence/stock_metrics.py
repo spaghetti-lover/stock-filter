@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
 from domain.entities.stock import Stock
-from domain.repositories.stock_repository import EarlyRejected, ProgressCallback
+from domain.repositories.layer1_stock_repository import EarlyRejected, ProgressCallback
 from domain.value_objects.market_regime import MarketRegime
 from infrastructure.market_data.data import get_all_symbols, get_trading_history, get_intraday
 from logger import get_logger

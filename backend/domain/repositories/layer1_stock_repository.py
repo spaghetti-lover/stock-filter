@@ -10,7 +10,7 @@ ProgressCallback = Callable[[int, int, str], Awaitable[None]]
 EarlyRejected = tuple[str, str, str]
 
 
-class StockRepository(ABC):
+class Layer1StockRepository(ABC):
     @abstractmethod
     async def list_stocks(
         self,

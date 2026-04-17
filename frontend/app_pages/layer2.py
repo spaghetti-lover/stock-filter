@@ -1,6 +1,5 @@
 """Layer 2 — BUY score page."""
 
-import json
 import requests
 import streamlit as st
 import pandas as pd
@@ -103,9 +102,18 @@ def render_scores(data: dict):
 
 # ── Main content ─────────────────────────────────────────────────────────────
 
-data = {}
+data = None
 with st.spinner("Loading scores..."):
-    data = {"scores": []}
+    try:
+        resp = requests.get(f"{API_BASE}/layer2")
+        if resp.ok:
+            data = resp.json()
+        else:
+            st.error(f"API error {resp.status_code}: {resp.text}")
+            st.stop()
+    except requests.ConnectionError:
+        st.error("Cannot connect to backend. Is the server running?")
+        st.stop()
 
 if data is None:
     st.error("Unexpected error fetching scores.", icon=":material/error:")

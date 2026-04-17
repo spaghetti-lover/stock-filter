@@ -182,7 +182,7 @@ else:
 
     data = None
     with st.spinner("Fetching data…"):
-        resp = requests.get("http://localhost:8000/stocks", params=params)
+        resp = requests.get("http://localhost:8000/layer1", params=params)
         if not resp.ok:
             st.error(f"API error {resp.status_code}: {resp.text}")
             st.stop()

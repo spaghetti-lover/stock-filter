@@ -2,7 +2,7 @@ import asyncio
 from datetime import datetime, timezone, timedelta
 
 from domain.entities.stock import Stock
-from domain.repositories.stock_repository import EarlyRejected, ProgressCallback, StockRepository
+from domain.repositories.layer1_stock_repository import EarlyRejected, ProgressCallback, Layer1StockRepository
 from domain.value_objects.market_regime import MarketRegime
 from infrastructure.market_data.data import get_vnindex_history
 from infrastructure.persistence.stock_metrics import (
@@ -14,7 +14,7 @@ from logger import get_logger
 log = get_logger(__name__)
 
 
-class StockRepositoryImpl(StockRepository):
+class Layer1StockRepositoryImpl(Layer1StockRepository):
     async def list_stocks(
         self,
         exchanges: set[str] | None = None,
