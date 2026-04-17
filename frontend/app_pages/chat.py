@@ -1,7 +1,10 @@
 """Stock assistant — chat page."""
 
+import os
 import requests
 import streamlit as st
+
+API_BASE = os.environ.get("BACKEND_URL", "http://localhost:8000")
 
 
 # ── Sidebar: chat settings ────────────────────────────────────────────────────
@@ -33,7 +36,7 @@ if prompt := st.chat_input("Ask about stocks…"):
         "provider": provider,
     }
     with st.spinner("Thinking…"):
-        resp = requests.post("http://localhost:8000/chat", json=payload)
+        resp = requests.post(f"{API_BASE}/chat", json=payload)
 
     if not resp.ok:
         try:

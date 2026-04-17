@@ -7,7 +7,8 @@ import streamlit as st
 import pandas as pd
 
 
-API_BASE = "http://localhost:8000"
+import os
+API_BASE = os.environ.get("BACKEND_URL", "http://localhost:8000")
 
 # ── Sidebar: Layer 1 filter controls ─────────────────────────────────────────
 with st.sidebar:

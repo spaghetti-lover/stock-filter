@@ -47,5 +47,5 @@ echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc && . ~/.bashrc
 - Login Claude
 
 ```
-docker compose up -d --build backend
+make migrate
 ```

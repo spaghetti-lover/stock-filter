@@ -2,7 +2,7 @@
 
 from dotenv import load_dotenv
 from pathlib import Path
-load_dotenv(Path(__file__).parent / ".env")
+load_dotenv(Path(__file__).parent / ".env", override=False)
 
 from logger import setup_logging, get_logger
 setup_logging(latest_only=True)
