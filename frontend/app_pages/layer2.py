@@ -1,69 +1,55 @@
-"""Layer 2 — BUY score page."""
-
-import json
-import requests
-import sseclient
-import streamlit as st
-import pandas as pd
-
+"""Layer 2 — BUY score page (auto-refreshed every 5 minutes)."""
 
 import os
+
+import pandas as pd
+import requests
+import streamlit as st
+from streamlit_autorefresh import st_autorefresh
+
+
 API_BASE = os.environ.get("BACKEND_URL", "http://localhost:8000")
+REFRESH_INTERVAL = 300
 
-# ── Sidebar ──────────────────────────────────────────────────────────────────
-with st.sidebar:
-    st.header("Layer 2 settings", anchor=False)
-    st.caption(
-        "BUY score = 35% Liquidity + 30% Momentum + 35% Breakout. "
-        "Scores stocks that passed Layer 1 on breakout quality."
-    )
-    refresh = st.button(
-        "Refresh scores",
-        type="secondary",
-        use_container_width=True,
-        icon=":material/refresh:",
-        help="Re-fetch live market data and recompute all BUY scores.",
-    )
+# Tick every second so the countdown circle animates smoothly.
+st_autorefresh(interval=1000, key="layer2_tick")
 
 
-# ── Scoring methodology ─────────────────────────────────────────────────────
-col_a, col_b, col_c = st.columns(3)
-with col_a:
-    with st.container(border=True):
-        st.markdown(":material/water_drop: **Liquidity** (35%)")
-        st.caption("GTGD20 · Intraday activity · CV stability")
-with col_b:
-    with st.container(border=True):
-        st.markdown(":material/speed: **Momentum** (30%)")
-        st.caption("Price volatility · MA analysis · RS vs VN-Index · A/D ratio · RSI+MACD")
-with col_c:
-    with st.container(border=True):
-        st.markdown(":material/rocket_launch: **Breakout** (35%)")
-        st.caption("Price breakout · Volume confirm · Dry-up · Base quality · Holding ratio")
+def fetch_latest() -> dict | None:
+    try:
+        resp = requests.get(f"{API_BASE}/layer2/latest", timeout=10)
+    except requests.ConnectionError:
+        st.error("Cannot connect to backend. Is the server running?")
+        return None
+    if not resp.ok:
+        st.error(f"API error {resp.status_code}: {resp.text}")
+        return None
+    return resp.json()
 
 
-# ── Helpers ──────────────────────────────────────────────────────────────────
+def render_countdown(next_refresh_in: int):
+    elapsed = REFRESH_INTERVAL - next_refresh_in
+    fraction = max(0.0, min(1.0, elapsed / REFRESH_INTERVAL))
+    mins, secs = divmod(next_refresh_in, 60)
+    st.progress(fraction, text=f":material/schedule: Next refresh in **{mins}m {secs:02d}s**")
+
 
 def render_scores(data: dict):
     scores = data.get("scores", [])
-    from_cache = data.get("from_cache", False)
     scored_at = data.get("scored_at")
 
     if not scores:
-        st.warning("No stocks could be scored. Check Layer 1 results.", icon=":material/warning:")
+        st.info(
+            "No Layer 2 scores yet. The scheduler refreshes every 5 minutes once Layer 1 has passed symbols.",
+            icon=":material/hourglass_empty:",
+        )
         return
 
     with st.container(horizontal=True):
         st.metric("Total scored", len(scores), border=True)
 
-    meta_parts = []
     if scored_at:
-        meta_parts.append(f"Scored at: `{scored_at[:19]}`")
-    if from_cache:
-        meta_parts.append(":material/cached: Served from cache")
-    else:
-        meta_parts.append(":material/cloud_download: Freshly computed")
-    st.caption(" · ".join(meta_parts))
+        st.caption(f":material/schedule: Scored at `{scored_at[:19]}`")
 
     rows = [
         {
@@ -98,67 +84,42 @@ def render_scores(data: dict):
     )
 
 
-def stream_layer2(use_refresh: bool) -> dict | None:
-    """Call /layer2/stream via SSE, show progress, return final result dict."""
-    progress_bar = st.progress(0, text="Starting scoring...")
-    status_text = st.empty()
+# ── Sidebar ──────────────────────────────────────────────────────────────────
+with st.sidebar:
+    st.header("Layer 2 settings", anchor=False)
+    st.caption(
+        "BUY score = 35% Liquidity + 30% Momentum + 35% Breakout. "
+        "Scored automatically every 5 minutes from Layer 1's passed symbols."
+    )
 
-    try:
-        resp = requests.get(
-            f"{API_BASE}/layer2/stream",
-            params={"refresh": "true" if use_refresh else "false"},
-            stream=True,
-            headers={"Accept": "text/event-stream"},
-        )
-        if not resp.ok:
-            st.error(f"API error {resp.status_code}: {resp.text}")
-            return None
+# ── Scoring methodology ─────────────────────────────────────────────────────
+col_a, col_b, col_c = st.columns(3)
+with col_a:
+    with st.container(border=True):
+        st.markdown(":material/water_drop: **Liquidity** (35%)")
+        st.caption("GTGD20 · Intraday activity · CV stability")
+with col_b:
+    with st.container(border=True):
+        st.markdown(":material/speed: **Momentum** (30%)")
+        st.caption("Price volatility · MA analysis · RS vs VN-Index · A/D ratio · RSI+MACD")
+with col_c:
+    with st.container(border=True):
+        st.markdown(":material/rocket_launch: **Breakout** (35%)")
+        st.caption("Price breakout · Volume confirm · Dry-up · Base quality · Holding ratio")
 
-        client = sseclient.SSEClient(resp.iter_content(chunk_size=None))
-        result = None
+st.divider()
 
-        for event in client.events():
-            payload = json.loads(event.data)
-            event_type = payload.get("type")
-
-            if event_type == "progress":
-                processed = payload["processed"]
-                total = payload["total"]
-                symbol = payload["symbol"]
-                pct = processed / total if total > 0 else 0
-                progress_bar.progress(pct, text=f"Scoring {symbol} ({processed}/{total})")
-
-            elif event_type == "result":
-                result = payload["data"]
-
-            elif event_type == "error":
-                progress_bar.empty()
-                status_text.empty()
-                code = payload.get("code", 500)
-                detail = payload.get("detail", "Unknown error")
-                if code == 422:
-                    st.warning(
-                        f"{detail}\n\nPlease go to **Layer 1** and run the filter first.",
-                        icon=":material/filter_alt:",
-                    )
-                else:
-                    st.error(f"Error: {detail}")
-                return None
-
-        progress_bar.empty()
-        status_text.empty()
-        return result
-
-    except requests.ConnectionError:
-        st.error("Cannot connect to backend. Is the server running?")
-        return None
-
-
-# ── Main content ─────────────────────────────────────────────────────────────
-
-data = stream_layer2(use_refresh=refresh)
-
-if data is None:
+# ── Fetch + render ──────────────────────────────────────────────────────────
+latest = fetch_latest()
+if latest is None:
     st.stop()
+
+cached = st.session_state.get("layer2_data")
+if cached is None or cached.get("scored_at") != latest.get("scored_at"):
+    st.session_state["layer2_data"] = latest
+
+data = st.session_state["layer2_data"]
+
+render_countdown(latest.get("next_refresh_in", REFRESH_INTERVAL))
 
 render_scores(data)
