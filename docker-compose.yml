@@ -25,11 +25,11 @@ services:
     env_file:
       - backend/.env
     environment:
-      DATABASE_URL: postgresql://postgres:password@db:5432/stock_data?sslmode=disable
+      DATABASE_URL: postgresql://postgres:password@db-stock-data:5432/stock_data?sslmode=disable
     volumes:
       - ~/.vnstock:/root/.vnstock:ro
     depends_on:
-      db:
+      db-stock-data:
         condition: service_healthy
 
   frontend:
