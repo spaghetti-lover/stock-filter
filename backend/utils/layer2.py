@@ -713,6 +713,8 @@ def cal_volume_expected(avg_volume_20d, minutes_elapsed):
     return avg_volume_20d * (minutes_elapsed / 225)
 
 def cal_volume_ratio(volume_intraday, volume_expected):
+    if volume_expected == 0:
+        return 0.0
     return volume_intraday / volume_expected
 
 def volume_confirmation_score(volume_ratio):
