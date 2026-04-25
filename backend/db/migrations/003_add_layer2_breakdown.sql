@@ -1,0 +1,1 @@
+ALTER TABLE layer2_scores ADD COLUMN IF NOT EXISTS breakdown JSONB;

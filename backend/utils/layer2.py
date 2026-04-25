@@ -10,6 +10,29 @@ class BuyScoreResult:
     breakout_score: float
 
 
+@dataclass
+class BuyScoreBreakdown:
+    buy_score: float
+    liquidity_score: float
+    momentum_score: float
+    breakout_score: float
+    liquidity: dict
+    momentum: dict
+    breakout: dict
+
+
+DEFAULT_WEIGHTS = {
+    "liquidity": 0.35, "momentum": 0.30, "breakout": 0.35,
+    "liq_gtgd20": 0.55, "liq_intraday": 0.30, "liq_cv": 0.15,
+    "mom_volatility": 0.30, "mom_ma": 0.20, "mom_rs": 0.20, "mom_ad": 0.15, "mom_tech": 0.15,
+    "brk_price": 0.30, "brk_vol": 0.25, "brk_dryup": 0.20, "brk_base": 0.15, "brk_hold": 0.10,
+    "composite_1d": 0.50, "composite_5d": 0.30, "composite_20d": 0.20,
+    "ma_ma20": 0.35, "ma_ma50": 0.30, "ma_slope": 0.35,
+    "rs_3m": 0.60, "rs_1m": 0.40,
+    "tech_rsi": 0.50, "tech_macd": 0.50,
+}
+
+
 # ---------------------------------------------------------------------------
 # Data extraction helpers
 # ---------------------------------------------------------------------------
@@ -81,9 +104,10 @@ def cal_buy_score(
     intraday: list[dict],        # get_intraday() — today's ticks: {time, price, volume}
     vnindex_history: list[dict], # get_vnindex_history() — same shape as history
     minutes_elapsed: float,      # trading minutes elapsed today (caller computes)
-) -> BuyScoreResult:
+) -> BuyScoreBreakdown:
     """
     Compute Layer 2 BUY score from raw market data.
+    Returns full breakdown with all intermediate values and sub-scores.
     Raises ValueError if history is too short (< 65 sessions including today).
     """
     if len(history) < 65:
@@ -104,62 +128,121 @@ def cal_buy_score(
     intraday_ratio_ = cal_intraday_ratio(gtgd_intraday, gtgd20_val, minutes_elapsed)
     cv_val          = cal_cv_val(cal_gtgd_daily(close_arr, vol_arr)[-21:-1])
 
-    s_liquidity = liquidity_score(
-        gtdg20_score(gtgd20_val),
-        intraday_score(intraday_ratio_),
-        cv_score(cv_val),
-    )
+    s_gtgd20    = gtdg20_score(gtgd20_val)
+    s_intraday  = intraday_score(intraday_ratio_)
+    s_cv        = cv_score(cv_val)
+    s_liquidity = liquidity_score(s_gtgd20, s_intraday, s_cv)
+
+    liq_breakdown = {
+        "gtgd20": {"value": gtgd20_val, "score": s_gtgd20},
+        "intraday_ratio": {"value": intraday_ratio_, "score": s_intraday},
+        "cv": {"value": cv_val, "score": s_cv},
+    }
 
     # ── Momentum ─────────────────────────────────────────────────────────
-    composite_ret = cal_composite_return(
-        cal_return_n_days(close_today, close_arr[-2]),
-        cal_return_n_days(close_today, close_arr[-6]),
-        cal_return_n_days(close_today, close_arr[-21]),
-    )
-    ma20_today  = cal_ma(close_arr, 20)
-    ma50_today  = cal_ma(close_arr, 50)
-    ma20_5d_ago = cal_ma_n_days_ago(close_arr, 20, 5)
+    ret_1d  = cal_return_n_days(close_today, close_arr[-2])
+    ret_5d  = cal_return_n_days(close_today, close_arr[-6])
+    ret_20d = cal_return_n_days(close_today, close_arr[-21])
+    composite_ret = cal_composite_return(ret_1d, ret_5d, ret_20d)
+    s_volatility = price_volatility_score(composite_ret)
 
-    s_momentum = momentum_score(
-        price_volatility_score(composite_ret),
-        ma_score(
-            cal_price_vs_ma(close_today, ma20_today),
-            cal_price_vs_ma(close_today, ma50_today),
-            cal_slope_pct(ma20_today, ma20_5d_ago),
-        ),
-        rs_score(cal_rs_weighted_from_history(close_arr, vn_close)),
-        ad_score(cal_ad_ratio(close_arr[-21:], vol_arr[-21:])),
-        technical_confirmation_score(
-            cal_rsi(close_arr),
-            cal_macd_histogram(close_arr, close_today),
-        ),
-    )
+    ma20_today   = cal_ma(close_arr, 20)
+    ma50_today   = cal_ma(close_arr, 50)
+    ma20_5d_ago  = cal_ma_n_days_ago(close_arr, 20, 5)
+    pv_ma20      = cal_price_vs_ma(close_today, ma20_today)
+    pv_ma50      = cal_price_vs_ma(close_today, ma50_today)
+    slope_val    = cal_slope_pct(ma20_today, ma20_5d_ago)
+    s_pv_ma20    = score_price_vs_ma(pv_ma20)
+    s_pv_ma50    = score_price_vs_ma(pv_ma50)
+    s_slope      = score_slope_pct(slope_val)
+    s_ma         = ma_score(pv_ma20, pv_ma50, slope_val)
+
+    stock_r3m = stock_return_n_days(close_arr[-1], close_arr[-64]) if len(close_arr) >= 64 else 0
+    stock_r1m = stock_return_n_days(close_arr[-1], close_arr[-22]) if len(close_arr) >= 22 else 0
+    vn_r3m    = vnindex_return_n_days(vn_close[-1], vn_close[-64]) if len(vn_close) >= 64 else 0
+    vn_r1m    = vnindex_return_n_days(vn_close[-1], vn_close[-22]) if len(vn_close) >= 22 else 0
+    rs_3m_val = cal_rs(stock_r3m, vn_r3m)
+    rs_1m_val = cal_rs(stock_r1m, vn_r1m)
+    rs_w_val  = cal_rs_weighted(rs_3m_val, rs_1m_val)
+    s_rs      = rs_score(rs_w_val)
+
+    ad_val    = cal_ad_ratio(close_arr[-21:], vol_arr[-21:])
+    s_ad      = ad_score(ad_val)
+
+    rsi_val   = cal_rsi(close_arr)
+    macd_val  = cal_macd_histogram(close_arr, close_today)
+    s_rsi     = score_rsi(rsi_val)
+    s_macd    = score_macd_histogram(macd_val)
+    s_tech    = technical_confirmation_score(rsi_val, macd_val)
+
+    s_momentum = momentum_score(s_volatility, s_ma, s_rs, s_ad, s_tech)
+
+    mom_breakdown = {
+        "composite_return": {
+            "value": composite_ret, "score": s_volatility,
+            "detail": {"return_1d": ret_1d, "return_5d": ret_5d, "return_20d": ret_20d},
+        },
+        "ma": {
+            "score": s_ma,
+            "detail": {
+                "price_vs_ma20": {"value": pv_ma20, "score": s_pv_ma20},
+                "price_vs_ma50": {"value": pv_ma50, "score": s_pv_ma50},
+                "slope_pct": {"value": slope_val, "score": s_slope},
+            },
+        },
+        "rs": {
+            "value": rs_w_val, "score": s_rs,
+            "detail": {"rs_3m": rs_3m_val, "rs_1m": rs_1m_val},
+        },
+        "ad": {"value": ad_val, "score": s_ad},
+        "technical": {
+            "score": s_tech,
+            "detail": {
+                "rsi": {"value": rsi_val, "score": s_rsi},
+                "macd_histogram_pct": {"value": macd_val, "score": s_macd},
+            },
+        },
+    }
 
     # ── Breakout ─────────────────────────────────────────────────────────
-    high20_val    = cal_high_20_sessions(high_arr[-21:])
-    b_ratio       = cal_breakout_ratio(close_today, high20_val)
-    vol_ratio_val = cal_volume_ratio(
+    high20_val     = cal_high_20_sessions(high_arr[-21:])
+    b_ratio        = cal_breakout_ratio(close_today, high20_val)
+    vol_ratio_val  = cal_volume_ratio(
         cal_intraday_volume(intraday),
         cal_volume_expected(avg_vol_20d, minutes_elapsed),
     )
-
-    s_breakout = breakout_score(
-        price_breakout_score(b_ratio),
-        volume_confirmation_score(vol_ratio_val),
-        volume_dryup_score(cal_dry_up_ratio(cal_pre_vol_avg(vol_arr), avg_vol_20d)),
-        base_quality_score(cal_narrowing_ratio(
-            cal_atr_n_days(high_arr, low_arr, 5),
-            cal_atr_n_days(high_arr, low_arr, 20),
-        )),
-        holding_score(cal_holding_ratio_intraday(intraday, high20_val)),
-        b_ratio,
+    dry_up_val     = cal_dry_up_ratio(cal_pre_vol_avg(vol_arr), avg_vol_20d)
+    narrowing_val  = cal_narrowing_ratio(
+        cal_atr_n_days(high_arr, low_arr, 5),
+        cal_atr_n_days(high_arr, low_arr, 20),
     )
+    holding_val    = cal_holding_ratio_intraday(intraday, high20_val)
 
-    return BuyScoreResult(
+    s_price_brk  = price_breakout_score(b_ratio)
+    s_vol_conf   = volume_confirmation_score(vol_ratio_val)
+    s_dryup      = volume_dryup_score(dry_up_val)
+    s_base       = base_quality_score(narrowing_val)
+    s_hold       = holding_score(holding_val)
+    gate_active  = b_ratio >= 1.0
+    s_breakout   = breakout_score(s_price_brk, s_vol_conf, s_dryup, s_base, s_hold, b_ratio)
+
+    brk_breakdown = {
+        "breakout_ratio": {"value": b_ratio, "score": s_price_brk},
+        "volume_ratio": {"value": vol_ratio_val, "score": s_vol_conf},
+        "dry_up_ratio": {"value": dry_up_val, "score": s_dryup},
+        "narrowing_ratio": {"value": narrowing_val, "score": s_base},
+        "holding_ratio": {"value": holding_val, "score": s_hold},
+        "gate_active": gate_active,
+    }
+
+    return BuyScoreBreakdown(
         buy_score=round(buy_score(s_liquidity, s_momentum, s_breakout), 2),
         liquidity_score=round(s_liquidity, 2),
         momentum_score=round(s_momentum, 2),
         breakout_score=round(s_breakout, 2),
+        liquidity=liq_breakdown,
+        momentum=mom_breakdown,
+        breakout=brk_breakdown,
     )
 
 

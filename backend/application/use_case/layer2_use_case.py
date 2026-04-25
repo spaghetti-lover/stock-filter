@@ -61,6 +61,11 @@ class Layer2UseCase:
                         liquidity_score=result.liquidity_score,
                         momentum_score=result.momentum_score,
                         breakout_score=result.breakout_score,
+                        breakdown={
+                            "liquidity": result.liquidity,
+                            "momentum": result.momentum,
+                            "breakout": result.breakout,
+                        },
                     )
                 except Exception:
                     log.warning("Failed to score %s", symbol, exc_info=True)
@@ -92,6 +97,7 @@ class Layer2UseCase:
                     "liquidity_score": s.liquidity_score,
                     "momentum_score": s.momentum_score,
                     "breakout_score": s.breakout_score,
+                    "breakdown": s.breakdown,
                 }
                 for s in scores
             ],

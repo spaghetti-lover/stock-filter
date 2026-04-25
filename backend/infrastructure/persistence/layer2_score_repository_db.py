@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone
 
 from db.connection import get_pool
@@ -10,7 +11,7 @@ class Layer2ScoreRepositoryDB(Layer2ScoreRepository):
         pool = get_pool()
         rows = await pool.fetch(
             "SELECT symbol, exchange, buy_score, liquidity_score, "
-            "momentum_score, breakout_score, scored_at "
+            "momentum_score, breakout_score, breakdown, scored_at "
             "FROM layer2_scores ORDER BY buy_score DESC"
         )
         if not rows:
@@ -23,6 +24,7 @@ class Layer2ScoreRepositoryDB(Layer2ScoreRepository):
                 liquidity_score=r["liquidity_score"],
                 momentum_score=r["momentum_score"],
                 breakout_score=r["breakout_score"],
+                breakdown=json.loads(r["breakdown"]) if r["breakdown"] else None,
             )
             for r in rows
         ]
@@ -45,13 +47,15 @@ class Layer2ScoreRepositoryDB(Layer2ScoreRepository):
                 await conn.executemany(
                     "INSERT INTO layer2_scores "
                     "(symbol, exchange, buy_score, liquidity_score, "
-                    "momentum_score, breakout_score, scored_at) "
-                    "VALUES ($1, $2, $3, $4, $5, $6, $7)",
+                    "momentum_score, breakout_score, breakdown, scored_at) "
+                    "VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
                     [
                         (
                             s.symbol, s.exchange, s.buy_score,
                             s.liquidity_score, s.momentum_score,
-                            s.breakout_score, now,
+                            s.breakout_score,
+                            json.dumps(s.breakdown) if s.breakdown else None,
+                            now,
                         )
                         for s in scores
                     ],
