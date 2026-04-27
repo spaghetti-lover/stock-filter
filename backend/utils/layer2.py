@@ -50,7 +50,8 @@ def extract_volume(history: list[dict]) -> list[float]:
     return [r["volume"] for r in history]
 
 def cal_gtgd_daily(close: list[float], volume: list[float]) -> list[float]:
-    return [close[i] * volume[i] for i in range(len(close))]
+    # close is in thousands VND (vnstock_data convention), multiply by 1000 to get VND
+    return [close[i] * 1000 * volume[i] for i in range(len(close))]
 
 def cal_gtgd20(close: list[float], volume: list[float]) -> float:
     gtgd_daily = cal_gtgd_daily(close, volume)
@@ -354,15 +355,15 @@ def cal_cv_val(gtdg20_values):
 
 
 def cv_score(cv):
-    if cv < 0.3:
+    if cv < 30:
         return 100
-    elif 0.3 <= cv < 0.5:
+    elif 30 <= cv < 50:
         return 80
-    elif 0.5 <= cv < 0.75:
+    elif 50 <= cv < 75:
         return 60
-    elif 0.75 <= cv < 1.0:
+    elif 75 <= cv < 100:
         return 40
-    elif 1.0 <= cv < 1.5:
+    elif 100 <= cv < 150:
         return 20
     else:
         return 0
