@@ -61,7 +61,8 @@ def cal_avg_volume_20d(volume: list[float]) -> float:
     return sum(volume[-21:-1]) / 20
 
 def cal_intraday_gtgd(intraday: list[dict]) -> float:
-    return sum(t["price"] * t["volume"] for t in intraday)
+    # price is in thousands VND (vnstock_data convention), multiply by 1000 to get VND
+    return sum(t["price"] * 1000 * t["volume"] for t in intraday)
 
 def cal_intraday_volume(intraday: list[dict]) -> float:
     return sum(t["volume"] for t in intraday)
@@ -348,6 +349,8 @@ CV = std(GTGD_20_phiên) / mean(GTGD_20_phiên) × 100
 | ≥ 150%   | 0        |
 """
 def cal_cv_val(gtdg20_values):
+    if len(gtdg20_values) < 2:
+        return 0.0
     mean_val = statistics.mean(gtdg20_values)
     if mean_val == 0:
         return 0
@@ -557,8 +560,10 @@ def cal_down_days_vol(close, volume):
 def cal_ad_ratio(close, volume):
     up_vol = cal_up_days_vol(close, volume)
     down_vol = cal_down_days_vol(close, volume)
-    if len(down_vol) == 0:  # Tránh chia cho 0
-        return float('inf')  # Rất tích lũy
+    if len(down_vol) == 0:
+        return float('inf')
+    if len(up_vol) == 0:
+        return 0.0
     return sum(up_vol) / len(up_vol) / (sum(down_vol) / len(down_vol))
 
 def ad_score(ad_ratio):
@@ -747,6 +752,8 @@ def cal_pre_vol_avg(volume):
     return sum(volume[-5:-1]) / 4  # Trung bình 4 phiên gần nhất trước T0
 
 def cal_dry_up_ratio(pre_vol_avg, avg_volume_20d):
+    if avg_volume_20d == 0:
+        return 1.0
     return pre_vol_avg / avg_volume_20d
 
 def volume_dryup_score(dry_up_ratio):
@@ -781,6 +788,8 @@ def cal_atr_n_days(high, low, n):
     return sum([high[i] - low[i] for i in range(-n, 0)]) / n
 
 def cal_narrowing_ratio(atr_5d, atr_20d):
+    if atr_20d == 0:
+        return 1.0
     return atr_5d / atr_20d
 
 def base_quality_score(narrowing_ratio):
