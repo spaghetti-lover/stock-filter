@@ -1,4 +1,4 @@
-.PHONY: remove_pycache db_start db_stop migrate db_check frontend backend
+.PHONY: remove_pycache db_start db_stop migrate migrate_prod migrate_rollback db_check frontend backend
 
 remove_pycache:
 	find . -type d -name "__pycache__" -exec rm -r {} +
@@ -16,14 +16,20 @@ db_stop:
 	docker stop stock_db && docker rm stock_db
 
 migrate:
-	psql "postgresql://postgres:password@localhost:5432/stock_data" -f backend/db/migrations/001_create_stocks.sql
-	psql "postgresql://postgres:password@localhost:5432/stock_data" -f backend/db/migrations/002_add_passed_and_layer2.sql
-	psql "postgresql://postgres:password@localhost:5432/stock_data" -f backend/db/migrations/003_add_layer2_breakdown.sql
+	cd backend && uv run yoyo apply --no-config-file \
+		--database "postgresql://postgres:password@localhost:5432/stock_data" \
+		./db/migrations
 
 migrate_prod:
-	docker exec -i stock-filter-db-stock-data-1 psql -U postgres -d stock_data < backend/db/migrations/001_create_stocks.sql
-	docker exec -i stock-filter-db-stock-data-1 psql -U postgres -d stock_data < backend/db/migrations/002_add_passed_and_layer2.sql
-	docker exec -i stock-filter-db-stock-data-1 psql -U postgres -d stock_data < backend/db/migrations/003_add_layer2_breakdown.sql
+	docker exec -i stock-filter-db-stock-data-1 \
+		sh -c "cd /app && uv run yoyo apply --no-config-file \
+		--database 'postgresql://postgres:password@db-stock-data:5432/stock_data' \
+		./db/migrations"
+
+migrate_rollback:
+	cd backend && uv run yoyo rollback --no-config-file \
+		--database "postgresql://postgres:password@localhost:5432/stock_data" \
+		./db/migrations
 
 db_check:
 	psql "postgresql://postgres:password@localhost:5432/stock_data" -c "SELECT count(*) AS total_stocks FROM stock_metrics;" -c "SELECT symbol, exchange, price, gtgd20, crawled_at FROM stock_metrics LIMIT 10;" -c "SELECT * FROM crawl_log ORDER BY id DESC LIMIT 5;"

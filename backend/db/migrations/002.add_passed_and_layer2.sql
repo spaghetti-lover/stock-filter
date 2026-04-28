@@ -1,3 +1,5 @@
+-- depends: 001.create_stocks
+
 -- Add passed flag to stock_metrics for Layer 1 → Layer 2 handoff
 ALTER TABLE stock_metrics ADD COLUMN IF NOT EXISTS passed BOOLEAN DEFAULT FALSE;
 
