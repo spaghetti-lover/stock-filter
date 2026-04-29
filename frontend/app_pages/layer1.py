@@ -1,14 +1,18 @@
 """Layer 1 — Hard filters page (live streaming)."""
 
 import json
+import os
+from datetime import datetime
+
+import pandas as pd
 import requests
 import sseclient
 import streamlit as st
-import pandas as pd
 
-
-import os
 API_BASE = os.environ.get("BACKEND_URL", "http://localhost:8000")
+
+if "watchlist" not in st.session_state:
+    st.session_state["watchlist"] = set()
 
 # ── Sidebar: Layer 1 filter controls ─────────────────────────────────────────
 with st.sidebar:
@@ -122,10 +126,12 @@ with st.sidebar:
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def build_df(stocks: list[dict], include_reason: bool = False) -> pd.DataFrame:
+    watchlist = st.session_state.get("watchlist", set())
     rows = []
     for s in stocks:
         intraday_ratio = s.get("intraday_ratio")
         row = {
+            "★": s["symbol"] in watchlist,
             "Symbol": s["symbol"],
             "Exchange": s["exchange"],
             "Status": s["status"],
@@ -141,6 +147,31 @@ def build_df(stocks: list[dict], include_reason: bool = False) -> pd.DataFrame:
             row["Reject reason"] = s.get("reject_reason", "")
         rows.append(row)
     return pd.DataFrame(rows)
+
+
+def _filter_stocks(stocks: list[dict], query: str, watchlist_only: bool) -> list[dict]:
+    watchlist = st.session_state.get("watchlist", set())
+    q = query.strip().upper()
+    out = []
+    for s in stocks:
+        if q and not s["symbol"].upper().startswith(q):
+            continue
+        if watchlist_only and s["symbol"] not in watchlist:
+            continue
+        out.append(s)
+    return out
+
+
+def _sync_watchlist_from_editor(edited_df: pd.DataFrame, source_stocks: list[dict]) -> None:
+    """Update session watchlist based on star-column edits."""
+    if edited_df.empty or "★" not in edited_df.columns:
+        return
+    watchlist = st.session_state.get("watchlist", set())
+    visible_symbols = {s["symbol"] for s in source_stocks}
+    starred = set(edited_df.loc[edited_df["★"] == True, "Symbol"].tolist())  # noqa: E712
+    watchlist -= visible_symbols
+    watchlist |= starred
+    st.session_state["watchlist"] = watchlist
 
 
 def render_market_regime(regime: dict | None):
@@ -250,25 +281,74 @@ else:
     col2.metric("Passed", len(passed))
     col3.metric("Filtered out", len(rejected))
 
+    today_str = datetime.now().strftime("%Y%m%d")
+
     # Passed stocks
     st.subheader(f"Passed stocks ({len(passed)})", anchor=False)
     if passed:
-        st.dataframe(
-            build_df(passed),
+        ctrl_search, ctrl_watch, ctrl_dl = st.columns([2, 1, 1])
+        with ctrl_search:
+            query = st.text_input(
+                "Search symbol",
+                key="layer1_passed_search",
+                placeholder="e.g. VC",
+                label_visibility="collapsed",
+            )
+        with ctrl_watch:
+            watchlist_only = st.toggle("★ only", key="layer1_passed_watch_only")
+
+        filtered_passed = _filter_stocks(passed, query, watchlist_only)
+        passed_df = build_df(passed)  # full df for CSV
+        with ctrl_dl:
+            st.download_button(
+                "Download CSV",
+                data=passed_df.drop(columns=["★"]).to_csv(index=False).encode("utf-8"),
+                file_name=f"layer1_passed_{today_str}.csv",
+                mime="text/csv",
+                use_container_width=True,
+                icon=":material/download:",
+            )
+
+        view_df = build_df(filtered_passed)
+        edited = st.data_editor(
+            view_df,
             use_container_width=True,
             hide_index=True,
+            disabled=[c for c in view_df.columns if c != "★"],
             column_config={
+                "★": st.column_config.CheckboxColumn("★", help="Add to watchlist", pinned=True),
                 "Symbol": st.column_config.TextColumn(pinned=True),
             },
+            key="layer1_passed_editor",
         )
+        _sync_watchlist_from_editor(edited, filtered_passed)
     else:
         st.warning("No stocks passed all filters.", icon=":material/filter_alt_off:")
 
     # Rejected stocks
     with st.expander(f"Filtered-out stocks ({len(rejected)})", expanded=False, icon=":material/block:"):
         if rejected:
+            r_search, _, r_dl = st.columns([2, 1, 1])
+            with r_search:
+                r_query = st.text_input(
+                    "Search rejected",
+                    key="layer1_rejected_search",
+                    placeholder="e.g. VC",
+                    label_visibility="collapsed",
+                )
+            rejected_df = build_df(rejected, include_reason=True)
+            with r_dl:
+                st.download_button(
+                    "Download CSV",
+                    data=rejected_df.drop(columns=["★"]).to_csv(index=False).encode("utf-8"),
+                    file_name=f"layer1_rejected_{today_str}.csv",
+                    mime="text/csv",
+                    use_container_width=True,
+                    icon=":material/download:",
+                )
+            filtered_rejected = _filter_stocks(rejected, r_query, watchlist_only=False)
             st.dataframe(
-                build_df(rejected, include_reason=True),
+                build_df(filtered_rejected, include_reason=True).drop(columns=["★"]),
                 use_container_width=True,
                 hide_index=True,
             )
