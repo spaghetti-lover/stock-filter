@@ -34,7 +34,7 @@ services:
     command: python3 -B -m streamlit run app.py --server.port 8501 --server.headless true --server.address 0.0.0.0
     working_dir: /app/frontend
     ports:
-      - "8501:8501"
+      - "2222:8501"
     environment:
       - BACKEND_URL=http://backend:8000
     depends_on:
