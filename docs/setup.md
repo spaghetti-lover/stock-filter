@@ -25,13 +25,6 @@ git pull
 - Add .env
 
 ```
-ANTHROPIC_API_KEY=sk-ant-...
-GOOGLE_API_KEY=AIza...
-OPENAI_API_KEY=sk-proj-...
-DATABASE_URL=postgresql://postgres:password@db-stock-data:5432/stock_data
-```
-
-```
 docker-compose up -d --build
 ```
 
@@ -54,5 +47,5 @@ echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc && . ~/.bashrc
 - Login Claude
 
 ```
-make migrate_prod
+make migrate
 ```

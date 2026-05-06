@@ -1,7 +1,6 @@
 """Layer 2 — BUY score page (auto-refreshed every 5 minutes)."""
 
 import os
-from datetime import datetime
 
 import pandas as pd
 import requests
@@ -11,9 +10,6 @@ from streamlit_autorefresh import st_autorefresh
 
 API_BASE = os.environ.get("BACKEND_URL", "http://localhost:8000")
 REFRESH_INTERVAL = 300
-
-if "watchlist" not in st.session_state:
-    st.session_state["watchlist"] = set()
 
 # Tick every second so the countdown circle animates smoothly.
 st_autorefresh(interval=1000, key="layer2_tick")
@@ -336,12 +332,9 @@ with st.container(horizontal=True):
 if scored_at:
     st.caption(f":material/schedule: Scored at `{scored_at[:19]}`")
 
-watchlist = st.session_state.get("watchlist", set())
-
 # Summary table
 rows = [
     {
-        "★": s["symbol"] in watchlist,
         "Symbol": s["symbol"],
         "Exchange": s["exchange"],
         "BUY Score": s.get("_buy_score", s["buy_score"]),
@@ -354,43 +347,11 @@ rows = [
 df = pd.DataFrame(rows)
 
 st.subheader(f"Scored stocks ({len(scores)})", anchor=False)
-
-ctrl_search, ctrl_watch, ctrl_dl = st.columns([2, 1, 1])
-with ctrl_search:
-    query = st.text_input(
-        "Search symbol",
-        key="layer2_search",
-        placeholder="e.g. VC",
-        label_visibility="collapsed",
-    )
-with ctrl_watch:
-    watchlist_only = st.toggle("★ only", key="layer2_watch_only")
-
-today_str = datetime.now().strftime("%Y%m%d")
-with ctrl_dl:
-    st.download_button(
-        "Download CSV",
-        data=df.drop(columns=["★"]).to_csv(index=False).encode("utf-8"),
-        file_name=f"layer2_scores_{today_str}.csv",
-        mime="text/csv",
-        use_container_width=True,
-        icon=":material/download:",
-    )
-
-view_df = df.copy()
-if query.strip():
-    q = query.strip().upper()
-    view_df = view_df[view_df["Symbol"].str.upper().str.startswith(q)]
-if watchlist_only:
-    view_df = view_df[view_df["Symbol"].isin(watchlist)]
-
-edited = st.data_editor(
-    view_df,
+st.dataframe(
+    df,
     use_container_width=True,
     hide_index=True,
-    disabled=[c for c in view_df.columns if c != "★"],
     column_config={
-        "★": st.column_config.CheckboxColumn("★", help="Add to watchlist", pinned=True),
         "Symbol": st.column_config.TextColumn(pinned=True),
         "BUY Score": st.column_config.ProgressColumn(
             "BUY Score",
@@ -402,17 +363,7 @@ edited = st.data_editor(
         "Momentum": st.column_config.NumberColumn(format="%.1f"),
         "Breakout": st.column_config.NumberColumn(format="%.1f"),
     },
-    key="layer2_editor",
 )
-
-# Sync watchlist from edited star column (only for visible rows)
-if not edited.empty:
-    visible_symbols = set(view_df["Symbol"].tolist())
-    starred = set(edited.loc[edited["★"] == True, "Symbol"].tolist())  # noqa: E712
-    new_watchlist = (watchlist - visible_symbols) | starred
-    if new_watchlist != watchlist:
-        st.session_state["watchlist"] = new_watchlist
-        st.rerun()
 
 # Per-stock breakdown
 if has_breakdown:
