@@ -1,5 +1,6 @@
 """Gemini implementation using the Google Gemini SDK with FastMCP in-process clients."""
 
+import contextlib
 import os
 
 from fastapi import HTTPException
@@ -9,9 +10,16 @@ from google.genai import types
 from google.genai.errors import ClientError
 
 from domain.agents.agent_provider import AgentProvider
+from infrastructure.agents.mcp_config import McpConfig, ALL_TOOLS
 from infrastructure.mcp.data import mcp as data_mcp
 from infrastructure.mcp.news import mcp as news_mcp
 from infrastructure.mcp.fundamentals import mcp as fundamentals_mcp
+
+_MCP_INSTANCE_MAP = {
+    "data": data_mcp,
+    "news": news_mcp,
+    "fundamentals": fundamentals_mcp,
+}
 
 
 def _to_gemini_role(role: str) -> str:
@@ -19,12 +27,10 @@ def _to_gemini_role(role: str) -> str:
 
 
 class GeminiAgent(AgentProvider):
-    def __init__(self, model: str = "gemini-2.5-flash"):
+    def __init__(self, model: str = "gemini-2.5-flash", mcp_config: McpConfig = ALL_TOOLS):
         self._model = model
         self._client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
-        self._data_client = Client(data_mcp)
-        self._news_client = Client(news_mcp)
-        self._fundamentals_client = Client(fundamentals_mcp)
+        self._mcp_clients = [Client(_MCP_INSTANCE_MAP[name]) for name in mcp_config.servers]
 
     async def chat(self, messages: list[dict], system_prompt: str) -> str:
         history: list[types.ContentOrDict] = [
@@ -37,16 +43,13 @@ class GeminiAgent(AgentProvider):
         last_message = messages[-1]["content"]
 
         try:
-            async with self._data_client, self._news_client, self._fundamentals_client:
+            async with contextlib.AsyncExitStack() as stack:
+                sessions = [await stack.enter_async_context(c) for c in self._mcp_clients]
                 chat_session = self._client.aio.chats.create(
                     model=self._model,
                     config=types.GenerateContentConfig(
                         system_instruction=system_prompt,
-                        tools=[
-                            self._data_client.session,
-                            self._news_client.session,
-                            self._fundamentals_client.session,
-                        ],
+                        tools=[c.session for c in sessions],
                     ),
                     history=history,
                 )

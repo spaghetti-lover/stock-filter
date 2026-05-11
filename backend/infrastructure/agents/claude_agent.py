@@ -5,27 +5,18 @@ from logger import get_logger
 from claude_agent_sdk import query, ClaudeAgentOptions, McpSdkServerConfig, ResultMessage, AssistantMessage, SystemMessage
 
 from domain.agents.agent_provider import AgentProvider
+from infrastructure.agents.mcp_config import McpConfig, ALL_TOOLS
 from infrastructure.mcp.data import mcp as data_mcp
 from infrastructure.mcp.news import mcp as news_mcp
 from infrastructure.mcp.fundamentals import mcp as fundamentals_mcp
 
 log = get_logger(__name__)
 
-TOOL_NAMES = [
-    "mcp__data__list_symbols",
-    "mcp__data__trading_history",
-    "mcp__data__intraday_data",
-    "mcp__data__stock_price",
-    "mcp__data__compare_stocks",
-    "mcp__news__stock_news",
-    "mcp__news__market_news",
-    "mcp__news__search_news",
-    "mcp__news__trending_topics",
-    "mcp__fundamentals__get_fundamentals",
-    "mcp__fundamentals__get_balance_sheet",
-    "mcp__fundamentals__get_cashflow",
-    "mcp__fundamentals__get_income_statement",
-]
+_MCP_SERVER_MAP = {
+    "data":         lambda: McpSdkServerConfig(type="sdk", name="data",         instance=data_mcp._mcp_server),
+    "news":         lambda: McpSdkServerConfig(type="sdk", name="news",         instance=news_mcp._mcp_server),
+    "fundamentals": lambda: McpSdkServerConfig(type="sdk", name="fundamentals", instance=fundamentals_mcp._mcp_server),
+}
 
 
 def _format_history(messages: list[dict]) -> str:
@@ -37,13 +28,10 @@ def _format_history(messages: list[dict]) -> str:
 
 
 class ClaudeAgent(AgentProvider):
-    def __init__(self, model: str = "claude-sonnet-4-6"):
+    def __init__(self, model: str = "claude-sonnet-4-6", mcp_config: McpConfig = ALL_TOOLS):
         self._model = model
-        self._mcp_servers = {
-            "data": McpSdkServerConfig(type="sdk", name="data", instance=data_mcp._mcp_server),
-            "news": McpSdkServerConfig(type="sdk", name="news", instance=news_mcp._mcp_server),
-            "fundamentals": McpSdkServerConfig(type="sdk", name="fundamentals", instance=fundamentals_mcp._mcp_server),
-        }
+        self._mcp_servers = {name: _MCP_SERVER_MAP[name]() for name in mcp_config.servers}
+        self._allowed_tools = mcp_config.allowed_tools
 
     async def chat(self, messages: list[dict], system_prompt: str) -> str:
         if len(messages) > 1:
@@ -57,8 +45,8 @@ class ClaudeAgent(AgentProvider):
             options=ClaudeAgentOptions(
                 model=self._model,
                 system_prompt=system_prompt,
-                mcp_servers=self._mcp_servers,
-                allowed_tools=TOOL_NAMES,
+                mcp_servers=self._mcp_servers, # pyright: ignore[reportArgumentType]
+                allowed_tools=self._allowed_tools,
             ),
         ):
             if isinstance(message, ResultMessage):
