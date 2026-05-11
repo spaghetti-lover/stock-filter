@@ -11,7 +11,7 @@ API_BASE = os.environ.get("BACKEND_URL", "http://localhost:8000")
 with st.sidebar:
     provider = st.selectbox(
         "LLM provider",
-        options=["claude", "gemini", "openai"],
+        options=["claude", "gemini"],
         index=0,
         key="chat_provider",
     )

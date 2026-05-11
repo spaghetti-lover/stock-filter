@@ -1,16 +1,30 @@
-"""Claude implementation using the Claude Agent SDK (claude-agent-sdk package)."""
+"""Claude implementation using the Claude Agent SDK with a FastMCP in-process server."""
 
 from logger import get_logger
 
-from claude_agent_sdk import query, ClaudeAgentOptions, ResultMessage, AssistantMessage, SystemMessage
+from claude_agent_sdk import query, ClaudeAgentOptions, McpSdkServerConfig, ResultMessage, AssistantMessage, SystemMessage
 
 from domain.agents.agent_provider import AgentProvider
-from infrastructure.agents.stock_tools import create_stock_mcp_server, TOOL_NAMES
+from infrastructure.agents.stock_tools import mcp
 
 log = get_logger(__name__)
 
+_SERVER_NAME = "stock-data"
+
+TOOL_NAMES = [
+    f"mcp__{_SERVER_NAME}__list_symbols",
+    f"mcp__{_SERVER_NAME}__trading_history",
+    f"mcp__{_SERVER_NAME}__intraday_data",
+    f"mcp__{_SERVER_NAME}__stock_price",
+    f"mcp__{_SERVER_NAME}__compare_stocks",
+    f"mcp__{_SERVER_NAME}__stock_news",
+    f"mcp__{_SERVER_NAME}__market_news",
+    f"mcp__{_SERVER_NAME}__search_news",
+    f"mcp__{_SERVER_NAME}__trending_topics",
+]
+
+
 def _format_history(messages: list[dict]) -> str:
-    """Render prior turns as readable text so the agent has conversation context."""
     lines = []
     for m in messages:
         label = "User" if m["role"] == "user" else "Assistant"
@@ -21,10 +35,13 @@ def _format_history(messages: list[dict]) -> str:
 class ClaudeAgent(AgentProvider):
     def __init__(self, model: str = "claude-sonnet-4-6"):
         self._model = model
-        self._mcp_server = create_stock_mcp_server()
+        self._mcp_server = McpSdkServerConfig(
+            type="sdk",
+            name=_SERVER_NAME,
+            instance=mcp._mcp_server,
+        )
 
     async def chat(self, messages: list[dict], system_prompt: str) -> str:
-        # Agent SDK takes a single prompt; reconstruct context from history
         if len(messages) > 1:
             history = _format_history(messages[:-1])
             prompt = f"Conversation so far:\n{history}\n\nUser: {messages[-1]['content']}"
@@ -36,7 +53,7 @@ class ClaudeAgent(AgentProvider):
             options=ClaudeAgentOptions(
                 model=self._model,
                 system_prompt=system_prompt,
-                mcp_servers={"stock-data": self._mcp_server},
+                mcp_servers={_SERVER_NAME: self._mcp_server},
                 allowed_tools=TOOL_NAMES,
             ),
         ):
