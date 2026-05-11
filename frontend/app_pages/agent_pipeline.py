@@ -1,8 +1,9 @@
-"""Layer 3 — Multi-agent trading decision pipeline (UI shell, demo data)."""
+"""Layer 3 — Multi-agent trading decision pipeline."""
 
 import os
 import time
 
+import requests
 import streamlit as st
 
 
@@ -95,15 +96,28 @@ def _init_state():
     st.session_state.setdefault("selected_phase", 0)
 
 
-def _new_run(symbol: str, horizon: str) -> dict:
-    return {
-        "symbol": symbol,
-        "horizon": horizon,
-        "started_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "status": "running",
-        "agents": {},
-        "verdict": None,
-    }
+def _start_run(symbol: str, horizon: str, provider: str = "claude") -> dict | None:
+    try:
+        resp = requests.post(
+            f"{API_BASE}/trading-agent/run",
+            json={"symbol": symbol, "horizon": horizon, "provider": provider},
+            timeout=10,
+        )
+        resp.raise_for_status()
+    except requests.RequestException as exc:
+        st.error(f"Failed to start pipeline: {exc}", icon=":material/error:")
+        return None
+    return _fetch_run(resp.json()["run_id"])
+
+
+def _fetch_run(run_id: str) -> dict | None:
+    try:
+        resp = requests.get(f"{API_BASE}/trading-agent/status/{run_id}", timeout=10)
+        resp.raise_for_status()
+    except requests.RequestException as exc:
+        st.error(f"Failed to fetch run status: {exc}", icon=":material/error:")
+        return None
+    return resp.json()
 
 
 def _agent_status(run: dict, key: str) -> str:
@@ -323,111 +337,6 @@ def render_sidebar(run: dict | None):
 
 
 # ---------------------------------------------------------------------------
-# Demo executor — drives the run client-side until a backend exists.
-# ---------------------------------------------------------------------------
-
-DEMO_REPORT_TEMPLATES = {
-    "fundamental": (
-        "**{symbol}** trades at a P/E discount to sector peers with stable "
-        "ROE > 15%. Free cash flow is positive over the trailing 4 quarters.\n\n"
-        "- Valuation: cheap on relative basis\n"
-        "- Earnings momentum: positive\n"
-        "- Balance sheet: low leverage\n"
-    ),
-    "sentiment": (
-        "Retail chatter on **{symbol}** is constructive: positive mention ratio "
-        "around 1.8× over the past week, no flagged controversies.\n\n"
-        "- Bullish posts: 64%\n"
-        "- Bearish posts: 21%\n"
-        "- Neutral: 15%\n"
-    ),
-    "news": (
-        "Recent headlines for **{symbol}** lean positive — earnings beat, new "
-        "contract announced, sector tailwind from policy update.\n\n"
-        "- Catalyst calendar: dividend record date in 2 weeks\n"
-        "- Macro: rates stable, FX neutral\n"
-    ),
-    "technical": (
-        "**{symbol}** holds above 20/50-day MAs; RSI at 58 (room to run); MACD "
-        "histogram positive and expanding. Volume confirms the breakout.\n\n"
-        "- Pattern: cup-with-handle resolved\n"
-        "- Support: prior pivot −3%\n"
-        "- Resistance: ATH +8%\n"
-    ),
-    "bull": (
-        "I see a clear setup on **{symbol}**: cheap, improving fundamentals, "
-        "constructive sentiment, and a confirmed technical breakout. The risk/"
-        "reward is asymmetric to the upside.\n"
-    ),
-    "bear": (
-        "Counterpoint: liquidity may dry up at higher levels and a sector "
-        "rotation is brewing. **{symbol}** has run quickly — chasing here "
-        "exposes us to a pullback.\n"
-    ),
-    "research_manager": (
-        "Synthesizing both views, the bull case prevails on weight of evidence. "
-        "Plan: enter on a controlled pullback, half-size first, scale on "
-        "confirmation. Invalidation below the 20-day MA.\n"
-    ),
-    "trader": (
-        "**Action: BUY {symbol}**. Initial 1.5% NAV at market; add 1.5% on a "
-        "close above prior pivot. Stop 3% below entry. Target +8.5% (1.5R).\n"
-    ),
-    "aggressive": (
-        "Push for full size now — the setup is rare and momentum compounds. "
-        "Cut quickly if the thesis breaks.\n"
-    ),
-    "conservative": (
-        "Half-size only. Equity beta is elevated and a single name should not "
-        "exceed 3% of NAV regardless of conviction.\n"
-    ),
-    "neutral": (
-        "Stage the entry: 1.5% now, 1.5% on confirmation. This balances "
-        "conviction with capital preservation.\n"
-    ),
-    "portfolio_manager": (
-        "Approved: 3% staged entry on **{symbol}**, stop at −3%, target +8.5%. "
-        "Logged to the simulated book and flagged for end-of-week review.\n"
-    ),
-}
-
-
-def step_demo(run: dict):
-    """Advance one agent per call: pending→running→done. Returns True if finished."""
-    for phase in PHASES:
-        for agent in phase["agents"]:
-            state = run["agents"].setdefault(agent["key"], {"status": "pending"})
-            if state["status"] in ("done", "error"):
-                continue
-            if state["status"] == "pending":
-                state["status"] = "running"
-                return False
-            if state["status"] == "running":
-                state["status"] = "done"
-                tpl = DEMO_REPORT_TEMPLATES.get(agent["key"], "**{symbol}** report.")
-                state["report"] = tpl.format(symbol=run["symbol"])
-                state["duration"] = 1.2
-                return False
-
-    run["verdict"] = {
-        "action": "BUY",
-        "confidence": 0.72,
-        "target": "+8.5%",
-        "stop": "-3.0%",
-        "size": "3% of NAV",
-        "horizon": run["horizon"],
-        "rationale": (
-            f"Analyst consensus on **{run['symbol']}** is constructive across "
-            "fundamentals, sentiment, news, and technicals. The bull thesis "
-            "prevailed against the bear's liquidity concern, and the risk team "
-            "approved a staged entry sized to 3% of NAV."
-        ),
-    }
-    run["status"] = "done"
-    return True
-
-
-# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -437,9 +346,11 @@ render_header()
 symbol, horizon, run_clicked = render_input_bar()
 
 if run_clicked and symbol:
-    st.session_state["pipeline_run"] = _new_run(symbol, horizon)
-    st.session_state["agent_symbol"] = symbol
-    st.session_state["phase_pick"] = 0  # focus on first phase on a fresh run
+    started = _start_run(symbol, horizon)
+    if started is not None:
+        st.session_state["pipeline_run"] = started
+        st.session_state["agent_symbol"] = symbol
+        st.session_state["phase_pick"] = 0  # focus on first phase on a fresh run
 
 run = st.session_state.get("pipeline_run")
 render_sidebar(run)
@@ -461,10 +372,15 @@ if run.get("verdict"):
     st.divider()
     render_verdict(run)
 
-# Demo loop — replace with backend polling later.
 if run["status"] == "running":
-    finished = step_demo(run)
-    if finished and run not in st.session_state["pipeline_history"]:
-        st.session_state["pipeline_history"].append(run)
-    time.sleep(0.6)
+    time.sleep(1.0)
+    refreshed = _fetch_run(run["run_id"])
+    if refreshed is not None:
+        st.session_state["pipeline_run"] = refreshed
     st.rerun()
+elif run["status"] in ("done", "error") and not any(
+    h.get("run_id") == run.get("run_id") for h in st.session_state["pipeline_history"]
+):
+    st.session_state["pipeline_history"].append(run)
+    if run["status"] == "error" and run.get("error"):
+        st.error(f"Pipeline failed: {run['error']}", icon=":material/error:")
