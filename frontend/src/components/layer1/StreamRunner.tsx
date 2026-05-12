@@ -63,8 +63,25 @@ export function StreamRunner({ active, filters, onResult, onError, onDone }: Pro
       <div className="thin-progress">
         <span style={{ width: `${pct}%` }} />
       </div>
-      <div className="pt-3 text-[12px] text-[var(--color-text-faint)]">
-        scanning {filters.exchanges.join(" · ") || "—"} · min GTGD20 ≥ {filters.min_gtgd20}B
+      <div className="flex items-center gap-2 pt-3 text-[12px] text-[var(--color-text-faint)]">
+        <span>Scanning</span>
+        <span className="inline-flex gap-[3px]" aria-hidden>
+          <motion.span
+            className="inline-block h-[3px] w-[3px] rounded-full bg-[var(--color-accent)]"
+            animate={{ opacity: [0.2, 1, 0.2] }}
+            transition={{ duration: 1.1, repeat: Infinity, delay: 0 }}
+          />
+          <motion.span
+            className="inline-block h-[3px] w-[3px] rounded-full bg-[var(--color-accent)]"
+            animate={{ opacity: [0.2, 1, 0.2] }}
+            transition={{ duration: 1.1, repeat: Infinity, delay: 0.18 }}
+          />
+          <motion.span
+            className="inline-block h-[3px] w-[3px] rounded-full bg-[var(--color-accent)]"
+            animate={{ opacity: [0.2, 1, 0.2] }}
+            transition={{ duration: 1.1, repeat: Infinity, delay: 0.36 }}
+          />
+        </span>
       </div>
     </motion.div>
   );
