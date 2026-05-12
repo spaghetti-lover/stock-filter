@@ -8,7 +8,6 @@ import { useWeightsStore } from "@/lib/store";
 import { WeightsSidebar } from "@/components/layer2/WeightsSidebar";
 import { CountdownBar } from "@/components/layer2/CountdownBar";
 import { ScoresTable } from "@/components/layer2/ScoresTable";
-import { BreakdownPanel } from "@/components/layer2/BreakdownPanel";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { Banner } from "@/components/ui/Banner";
 import type { Layer2Score } from "@/lib/types";
@@ -26,19 +25,16 @@ export default function Layer2Page() {
 
   const rows = useMemo<(Layer2Score & { _scores?: RecomputedScores })[]>(() => {
     const scores = query.data?.scores ?? [];
-    const enriched: (Layer2Score & { _scores?: RecomputedScores })[] = scores.map((s) =>
+    return scores.map((s) =>
       s.breakdown ? { ...s, _scores: recomputeScores(s.breakdown, weights) } : { ...s },
-    );
-    return enriched.sort(
-      (a, b) => (b._scores?.buy ?? b.buy_score) - (a._scores?.buy ?? a.buy_score),
     );
   }, [query.data, weights]);
 
   const [selected, setSelected] = useState<string | null>(null);
-  const selectedStock = useMemo(
-    () => rows.find((r) => r.symbol === selected) ?? rows[0],
-    [rows, selected],
-  );
+
+  function handleSelect(sym: string) {
+    setSelected((prev) => (prev === sym ? null : sym));
+  }
 
   return (
     <div className="flex">
@@ -56,7 +52,7 @@ export default function Layer2Page() {
           </div>
         </div>
 
-        <div className="mx-auto flex max-w-[1320px] flex-col gap-8 px-8 py-10">
+        <div className="mx-auto flex max-w-[1320px] flex-col gap-6 px-8 py-8">
           {query.isLoading ? (
             <Banner tone="info">Loading scores…</Banner>
           ) : query.error ? (
@@ -74,29 +70,45 @@ export default function Layer2Page() {
                 scoredAt={query.data.scored_at}
               />
 
-              <div className="flex items-baseline gap-3">
-                <span className="display text-[24px] tracking-tight">Scored</span>
-                <span className="mono text-[13px] text-[var(--color-text-dim)]">
-                  ({rows.length})
-                </span>
+              <div className="flex items-center gap-6 border-b border-dashed border-[var(--color-line)] pb-5">
+                <Stat label="Scored" value={String(rows.length)} />
+                <div className="h-6 w-px bg-[var(--color-line)]" />
+                <Stat
+                  label="Top BUY"
+                  value={rows.length ? String(Math.max(...rows.map((r) => r._scores?.buy ?? r.buy_score)).toFixed(1)) : "—"}
+                  accent
+                />
+                <div className="h-6 w-px bg-[var(--color-line)]" />
+                <Stat
+                  label="With breakout"
+                  value={String(rows.filter((r) => (r._scores?.brk ?? r.breakout_score) > 0).length)}
+                />
               </div>
 
               <ScoresTable
                 rows={rows}
-                selected={selectedStock?.symbol ?? null}
-                onSelect={setSelected}
+                selected={selected}
+                onSelect={handleSelect}
+                weights={weights}
               />
-
-              {selectedStock?.breakdown ? (
-                <div className="pt-2">
-                  <div className="tag pb-3">Breakdown · {selectedStock.symbol}</div>
-                  <BreakdownPanel stock={selectedStock} weights={weights} />
-                </div>
-              ) : null}
             </>
           )}
         </div>
       </section>
+    </div>
+  );
+}
+
+function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="tag text-[10px]">{label}</span>
+      <span
+        className="serif-num text-[22px] leading-none"
+        style={{ color: accent ? "var(--color-accent)" : "var(--color-text)" }}
+      >
+        {value}
+      </span>
     </div>
   );
 }

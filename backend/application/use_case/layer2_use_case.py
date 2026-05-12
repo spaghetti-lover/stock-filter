@@ -46,7 +46,8 @@ class Layer2UseCase:
             exchange = item["exchange"]
             async with sem:
                 try:
-                    history_fut = loop.run_in_executor(executor, get_trading_history, symbol, 100)
+                    fetch_days = int(65 * 365 / 252) + 15
+                    history_fut = loop.run_in_executor(executor, get_trading_history, symbol, fetch_days)
                     intraday_fut = loop.run_in_executor(executor, get_intraday, symbol)
                     history, intraday = await asyncio.gather(history_fut, intraday_fut)
 

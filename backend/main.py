@@ -7,6 +7,7 @@ load_dotenv(Path(__file__).parent / ".env", override=False)
 from logger import setup_logging, get_logger
 setup_logging(latest_only=True)
 
+import asyncio
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -29,6 +30,7 @@ async def lifespan(app: FastAPI):
         await layer2_usecase.execute(refresh=True)
 
     start_scheduler(crawl_usecase.execute, layer2_refresh)
+    asyncio.create_task(layer2_refresh())
     log.info("App started: DB pool and scheduler initialized")
     yield
     stop_scheduler()
@@ -53,4 +55,3 @@ app.add_middleware(
 app.include_router(layer1.router, tags=["Layer 1"])
 app.include_router(layer2.router, tags=["Layer 2"])
 app.include_router(chat.router, tags=["Chat"])
-app.include_router(trading_agent.router, tags=["Trading Agent"])
