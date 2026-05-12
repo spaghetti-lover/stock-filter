@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Pill } from "@/components/ui/Pill";
 import { fmtScore } from "@/lib/format";
@@ -158,7 +158,7 @@ export function ScoresTable({
           </tr>
         </thead>
         <tbody>
-          <AnimatePresence mode="popLayout" initial={false}>
+          <AnimatePresence initial={false}>
             {sorted.map((r, i) => {
               const buy = r._scores?.buy ?? r.buy_score;
               const liq = r._scores?.liq ?? r.liquidity_score;
@@ -168,9 +168,8 @@ export function ScoresTable({
               const buyColor = scoreColor(buy);
 
               return (
-                <>
+                <React.Fragment key={r.symbol}>
                   <motion.tr
-                    key={r.symbol}
                     layout
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -236,7 +235,7 @@ export function ScoresTable({
                       <InlineBreakdown key={`bd-${r.symbol}`} row={r} weights={weights} />
                     )}
                   </AnimatePresence>
-                </>
+                </React.Fragment>
               );
             })}
           </AnimatePresence>
