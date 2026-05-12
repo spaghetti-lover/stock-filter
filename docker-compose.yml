@@ -30,13 +30,15 @@ services:
         condition: service_healthy
 
   frontend:
-    build: .
-    command: python3 -B -m streamlit run app.py --server.port 8501 --server.headless true --server.address 0.0.0.0
-    working_dir: /app/frontend
+    build:
+      context: ./frontend
+      args:
+        # Browser must hit a URL it can resolve from the host.
+        NEXT_PUBLIC_BACKEND_URL: http://localhost:8000
     ports:
-      - "2222:8501"
+      - "2222:3000"
     environment:
-      - BACKEND_URL=http://backend:8000
+      NEXT_PUBLIC_BACKEND_URL: http://localhost:8000
     depends_on:
       - backend
 

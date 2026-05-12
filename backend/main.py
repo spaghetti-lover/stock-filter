@@ -7,9 +7,11 @@ load_dotenv(Path(__file__).parent / ".env", override=False)
 from logger import setup_logging, get_logger
 setup_logging(latest_only=True)
 
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from presentation.api.routes import layer1, layer2, chat, trading_agent
+from fastapi.middleware.cors import CORSMiddleware
+from presentation.api.routes import layer1, layer2, chat
 from db.connection import init_pool, close_pool
 from infrastructure.scheduler.scheduler import start_scheduler, stop_scheduler
 from infrastructure.container import get_crawl_usecase, get_layer2_usecase
@@ -35,6 +37,19 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+_default_origins = "http://localhost:3000,http://localhost:2222"
+_allow_origins = [
+    o.strip() for o in os.environ.get("CORS_ALLOW_ORIGINS", _default_origins).split(",") if o.strip()
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_allow_origins,
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
+
 app.include_router(layer1.router, tags=["Layer 1"])
 app.include_router(layer2.router, tags=["Layer 2"])
 app.include_router(chat.router, tags=["Chat"])

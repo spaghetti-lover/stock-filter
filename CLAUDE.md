@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Vietnam Stock Filter — a web app that filters Vietnamese stocks (HOSE/HNX/UPCOM) using trading metrics. A daily crawl pipeline fetches data from the vnstock API and stores computed metrics in PostgreSQL. The FastAPI backend serves cached data for fast retrieval, with a live streaming endpoint available. Frontend is Streamlit.
+Vietnam Stock Filter — a web app that filters Vietnamese stocks (HOSE/HNX/UPCOM) using trading metrics. A daily crawl pipeline fetches data from the vnstock API and stores computed metrics in PostgreSQL. The FastAPI backend serves cached data for fast retrieval, with a live streaming endpoint available. Frontend is Next.js (App Router, Bun).
 
 ## Commands
 
@@ -22,8 +22,8 @@ make db_check       # Check crawled stock data in database
 # Backend (from repo root)
 cd backend && uv run uvicorn main:app --reload   # http://localhost:8000, docs at /docs
 
-# Frontend (from repo root)
-cd frontend && uv run streamlit run app.py --server.headless true   # http://localhost:8501
+# Frontend (from repo root) — Next.js + Bun
+cd frontend && bun install && bun dev   # http://localhost:3000
 
 # Docker (production)
 docker compose up -d --build
@@ -43,13 +43,13 @@ Clean Architecture with four layers:
   - `container.py` — Composition root (DI wiring)
 - **Presentation** (`backend/presentation/api/routes/`) — FastAPI routes: `GET /layer1` (cached), `GET /layer1/stream` (live SSE), `GET /layer2` (stub), `POST /crawl/trigger`, `GET /crawl/status`, `POST /chat`
 
-Frontend (`frontend/`) is a Streamlit app that consumes the Layer 1 and Layer 2 endpoints.
+Frontend (`frontend/`) is a Next.js (App Router, React 19, TypeScript) app served by Bun. State: Zustand store (`src/lib/store.ts`) persists `lastStocks` so Layer 1 results flow into the chat page as `stocks_context`. Layer 2 weighting is recomputed client-side (`src/lib/scoring.ts` is a verbatim port of the Streamlit `recompute_scores` function — numerical parity is required). Browser requests use `NEXT_PUBLIC_BACKEND_URL` (default `http://localhost:8000`). The backend enables CORS via `CORS_ALLOW_ORIGINS` env (defaults to `http://localhost:3000,http://localhost:2222`).
 
 ### Data Flow
 
-**Cached (default):** Streamlit → `GET /layer1` → `Layer1UseCase` → `Layer1StockRepositoryDB` → PostgreSQL
+**Cached (default):** Next.js → `GET /layer1` → `Layer1UseCase` → `Layer1StockRepositoryDB` → PostgreSQL
 
-**Live (stream):** Streamlit → `GET /layer1/stream` (SSE) → `Layer1UseCase` → `Layer1StockRepositoryImpl` → vnstock API
+**Live (stream):** Next.js (EventSource) → `GET /layer1/stream` (SSE) → `Layer1UseCase` → `Layer1StockRepositoryImpl` → vnstock API
 
 **Daily crawl:** APScheduler (16:00 VN) → `CrawlUseCase` → `CrawlRepositoryImpl` → vnstock API → PostgreSQL
 
