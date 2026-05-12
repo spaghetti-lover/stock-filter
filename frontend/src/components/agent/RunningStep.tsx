@@ -2,54 +2,97 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BoxPanel } from "./BoxPanel";
+import { Markdown } from "@/components/chat/Markdown";
+import {
+  openAgentStream,
+  type AgentSseEvent,
+  type AgentRunStatus,
+  type RunReports,
+} from "@/lib/tradingAgent";
+
+type ReportRenderMode = "markdown" | "raw";
 
 interface Props {
+  runId: string | null;
   symbol: string;
   date: string;
   analystCodes: string[];
   locked?: boolean;
   done?: boolean;
-  onComplete: () => void;
+  onComplete: (result: { error: string | null }) => void;
 }
 
-type AgentStatus = "pending" | "in_progress" | "completed";
+type AgentStatus = "pending" | "in_progress" | "completed" | "error";
 
 interface AgentRow {
   team: string;
   agent: string;
-  code: string;
   status: AgentStatus;
 }
 
-interface ToolRow {
+interface MsgRow {
   time: string;
-  type: "Tool" | "LLM" | "System";
+  type: string;
   content: string;
 }
 
-const ANALYST_LABEL: Record<string, { agent: string; team: string }> = {
-  market: { agent: "Market Analyst", team: "Analyst Team" },
-  social: { agent: "Social Analyst", team: "Analyst Team" },
-  news: { agent: "News Analyst", team: "Analyst Team" },
-  fundamentals: { agent: "Fundamentals Analyst", team: "Analyst Team" },
+const ANALYST_LABEL: Record<string, string> = {
+  market: "Market Analyst",
+  social: "Social Analyst",
+  news: "News Analyst",
+  fundamentals: "Fundamentals Analyst",
 };
 
-const RESEARCH_AGENTS: AgentRow[] = [
-  { team: "Research Team", agent: "Bull Researcher", code: "bull", status: "pending" },
-  { team: "Research Team", agent: "Bear Researcher", code: "bear", status: "pending" },
-  { team: "Research Team", agent: "Research Manager", code: "research_mgr", status: "pending" },
-];
+const FIXED_TEAMS: Record<string, string[]> = {
+  "Research Team": ["Bull Researcher", "Bear Researcher", "Research Manager"],
+  "Trading Team": ["Trader"],
+  "Risk Management": ["Aggressive Analyst", "Neutral Analyst", "Conservative Analyst"],
+  "Portfolio Management": ["Portfolio Manager"],
+};
 
-const TRADER_AGENTS: AgentRow[] = [
-  { team: "Trading Team", agent: "Trader", code: "trader", status: "pending" },
-];
+const SECTION_TITLE: Record<string, string> = {
+  market_report: "Market Analysis",
+  sentiment_report: "Social Sentiment",
+  news_report: "News Analysis",
+  fundamentals_report: "Fundamentals Analysis",
+  investment_plan: "Research Team Decision",
+  trader_investment_plan: "Trading Team Plan",
+  final_trade_decision: "Portfolio Management Decision",
+};
 
-const RISK_AGENTS: AgentRow[] = [
-  { team: "Risk Team", agent: "Risky Analyst", code: "risky", status: "pending" },
-  { team: "Risk Team", agent: "Safe Analyst", code: "safe", status: "pending" },
-  { team: "Risk Team", agent: "Neutral Analyst", code: "neutral", status: "pending" },
-  { team: "Risk Team", agent: "Risk Manager", code: "risk_mgr", status: "pending" },
-];
+const SECTION_ANALYST_GATE: Record<string, string> = {
+  market_report: "market",
+  sentiment_report: "social",
+  news_report: "news",
+  fundamentals_report: "fundamentals",
+};
+
+function buildInitialAgents(analystCodes: string[]): AgentRow[] {
+  const analysts: AgentRow[] = analystCodes
+    .map((code) => ({
+      team: "Analyst Team",
+      agent: ANALYST_LABEL[code] ?? code,
+      status: "pending" as AgentStatus,
+    }));
+  const fixed: AgentRow[] = [];
+  for (const [team, members] of Object.entries(FIXED_TEAMS)) {
+    for (const agent of members) {
+      fixed.push({ team, agent, status: "pending" });
+    }
+  }
+  return [...analysts, ...fixed];
+}
+
+function expectedReportSections(analystCodes: string[]): string[] {
+  const out: string[] = [];
+  for (const section of Object.keys(SECTION_TITLE)) {
+    const analyst = SECTION_ANALYST_GATE[section];
+    if (analyst === undefined || analystCodes.includes(analyst)) {
+      out.push(section);
+    }
+  }
+  return out;
+}
 
 function fmtClock(seconds: number) {
   const m = Math.floor(seconds / 60);
@@ -57,70 +100,13 @@ function fmtClock(seconds: number) {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-function fmtNow(d: Date) {
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(
-    2,
-    "0",
-  )}:${String(d.getSeconds()).padStart(2, "0")}`;
+function formatTokens(n: number) {
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+  return String(n);
 }
-
-function buildToolScript(symbol: string, date: string): Omit<ToolRow, "time">[] {
-  return [
-    {
-      type: "Tool",
-      content: `get_ohlcv: {'ticker': '${symbol}', 'start_date': '${shiftDate(date, -60)}', 'end_date': '${date}'}`,
-    },
-    {
-      type: "Tool",
-      content: `get_indicators: {'ticker': '${symbol}', 'set': 'core', 'period': 14}`,
-    },
-    {
-      type: "Tool",
-      content: `get_news: {'ticker': '${symbol}', 'start_date': '${shiftDate(date, -7)}', 'end_date': '${date}'}`,
-    },
-    {
-      type: "Tool",
-      content: `get_global_news: {'curr_date': '${date}', 'look_back_days': 7, 'limit': 10}`,
-    },
-    {
-      type: "Tool",
-      content: `get_reddit_sentiment: {'ticker': '${symbol}', 'window': '7d'}`,
-    },
-    {
-      type: "Tool",
-      content: `get_fundamentals: {'ticker': '${symbol}', 'period': 'TTM'}`,
-    },
-    {
-      type: "LLM",
-      content: `summarize_analyst_report → market analyst draft (1812 tokens)`,
-    },
-    {
-      type: "Tool",
-      content: `vector_search: {'index': 'memory', 'query': 'recent macro tailwinds ${symbol}'}`,
-    },
-  ];
-}
-
-function shiftDate(iso: string, days: number) {
-  const d = new Date(iso);
-  d.setDate(d.getDate() + days);
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}
-
-const REPORT_CHUNKS = [
-  "Excellent! I now have comprehensive data to write a detailed analysis report. Let me compile everything into a thorough report.",
-  "\n\n———\n\n## 📊 {SYMBOL} — Weekly Social Media, News & Sentiment Analysis Report\n\nReport Date: {DATE} | Coverage Period: rolling 7 days",
-  "\n\n### 1. ⏱ Executive Summary",
-  "\n\nThe {SYMBOL} ticker has had a notably bullish week driven by three dominant macro tailwinds: **strong Q1 corporate earnings**, **renewed AI investment optimism**, and **cooling geopolitical tensions** in the Middle East.",
-  "\n\nMultiple sources confirmed the S&P 500 and Nasdaq 100 reached **record highs** during this period. The VIX settled at approximately **17.39**, signaling a moderate but not complacent level of investor anxiety.",
-  "\n\n### 2. 🌐 Social Sentiment Pulse",
-  "\n\n- Reddit r/wallstreetbets mentions: **+38% w/w**, predominantly bullish framing\n- StockTwits sentiment score: **0.62** (bullish) vs. **0.41** prior week\n- Notable retail narratives center on AI-led mega-cap leadership",
-];
 
 export function RunningStep({
+  runId,
   symbol,
   date,
   analystCodes,
@@ -128,182 +114,190 @@ export function RunningStep({
   done = false,
   onComplete,
 }: Props) {
-  const initialAgents = useMemo<AgentRow[]>(() => {
-    const analysts: AgentRow[] = analystCodes.map((code) => ({
-      code,
-      agent: ANALYST_LABEL[code]?.agent ?? code,
-      team: ANALYST_LABEL[code]?.team ?? "Analyst Team",
-      status: "pending",
-    }));
-    return [...analysts, ...RESEARCH_AGENTS, ...TRADER_AGENTS, ...RISK_AGENTS];
-  }, [analystCodes]);
+  const initialAgents = useMemo(() => buildInitialAgents(analystCodes), [analystCodes]);
+  const expectedSections = useMemo(
+    () => expectedReportSections(analystCodes),
+    [analystCodes],
+  );
 
   const [agents, setAgents] = useState<AgentRow[]>(initialAgents);
-  const [tools, setTools] = useState<ToolRow[]>([]);
-  const [report, setReport] = useState("");
+  const [messages, setMessages] = useState<MsgRow[]>([]);
+  const [reports, setReports] = useState<RunReports>({});
+  const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [stats, setStats] = useState({ llm_calls: 0, tool_calls: 0, tokens_in: 0, tokens_out: 0 });
   const [elapsed, setElapsed] = useState(0);
-  const [tokensUp, setTokensUp] = useState(0);
-  const [tokensDown, setTokensDown] = useState(0);
-  const [reports, setReports] = useState(0);
-  const [llmCalls, setLlmCalls] = useState(0);
-  const completedRef = useRef(false);
+  const [runStatus, setRunStatus] = useState<AgentRunStatus>("pending");
+  const [error, setError] = useState<string | null>(null);
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
 
-  const totalAgents = initialAgents.length;
-  const totalReports = 7;
-  const toolScript = useMemo(() => buildToolScript(symbol, date), [symbol, date]);
-
+  // Reset transient state when a new run is started so a re-run after restart
+  // doesn't display stale agents or messages.
   useEffect(() => {
-    if (locked || done) return;
+    setAgents(initialAgents);
+    setMessages([]);
+    setReports({});
+    setActiveSection(null);
+    setStats({ llm_calls: 0, tool_calls: 0, tokens_in: 0, tokens_out: 0 });
+    setElapsed(0);
+    setRunStatus("pending");
+    setError(null);
+  }, [runId, initialAgents]);
 
-    // Wall-clock ticker
-    const tickStart = Date.now();
-    const tickHandle = window.setInterval(() => {
-      setElapsed(Math.floor((Date.now() - tickStart) / 1000));
-      setTokensUp((t) => t + Math.floor(Math.random() * 480) + 220);
-      setTokensDown((t) => t + Math.floor(Math.random() * 110) + 40);
-    }, 250);
+  // Wall-clock ticker
+  useEffect(() => {
+    if (locked || done || runStatus === "done" || runStatus === "error") return;
+    const started = Date.now();
+    const handle = window.setInterval(() => {
+      setElapsed(Math.floor((Date.now() - started) / 1000));
+    }, 1000);
+    return () => window.clearInterval(handle);
+  }, [locked, done, runStatus]);
 
-    // Scripted agent + tool timeline
-    const timeouts: number[] = [];
-    const schedule = (ms: number, fn: () => void) => {
-      timeouts.push(window.setTimeout(fn, ms));
+  // SSE stream
+  useEffect(() => {
+    if (!runId || locked) return;
+
+    const handler = (e: AgentSseEvent) => {
+      switch (e.type) {
+        case "snapshot": {
+          if (e.agents && Object.keys(e.agents).length) {
+            setAgents((prev) =>
+              prev.map((row) => ({
+                ...row,
+                status: (e.agents[row.agent] as AgentStatus | undefined) ?? row.status,
+              })),
+            );
+          }
+          if (e.reports) setReports(e.reports);
+          if (e.stats) setStats(e.stats);
+          if (e.messages?.length) {
+            setMessages(
+              e.messages.map((m) => ({ time: m.time, type: m.type, content: m.content })),
+            );
+          }
+          if (e.tool_calls?.length) {
+            setMessages((prev) => [
+              ...e.tool_calls.map((t) => ({ time: t.time, type: "Tool", content: `${t.name}: ${t.args}` })),
+              ...prev,
+            ]);
+          }
+          if (e.status) setRunStatus(e.status);
+          break;
+        }
+        case "agent_status": {
+          setAgents((prev) =>
+            prev.map((row) =>
+              row.agent === e.agent ? { ...row, status: e.status as AgentStatus } : row,
+            ),
+          );
+          break;
+        }
+        case "report": {
+          setReports((prev) => ({ ...prev, [e.section]: e.content }));
+          setActiveSection(e.section);
+          break;
+        }
+        case "message": {
+          setMessages((prev) =>
+            [{ time: e.time ?? "", type: e.msg_type, content: e.content }, ...prev].slice(0, 200),
+          );
+          break;
+        }
+        case "tool_call": {
+          setMessages((prev) =>
+            [
+              { time: e.time ?? "", type: "Tool", content: `${e.name}: ${e.args}` },
+              ...prev,
+            ].slice(0, 200),
+          );
+          break;
+        }
+        case "stats": {
+          setStats(e.stats);
+          break;
+        }
+        case "complete_report": {
+          // The full report is also available via the run report endpoint.
+          break;
+        }
+        case "final_state": {
+          break;
+        }
+        case "status": {
+          setRunStatus(e.status);
+          if (e.error) setError(e.error);
+          if (e.status === "done" || e.status === "error") {
+            onCompleteRef.current({ error: e.error ?? null });
+          }
+          break;
+        }
+      }
     };
 
-    // Stage 1: kick off first three analysts
-    schedule(200, () =>
-      setAgents((prev) =>
-        prev.map((a, i) =>
-          i === 0 ? { ...a, status: "in_progress" } : a,
-        ),
-      ),
-    );
-    schedule(400, () => pushTool(toolScript[0]));
-    schedule(900, () => pushTool(toolScript[1]));
-    schedule(1100, () => bumpLlm());
-    schedule(1400, () => {
-      setAgents((prev) =>
-        prev.map((a, i) => {
-          if (i === 0) return { ...a, status: "completed" };
-          if (i === 1) return { ...a, status: "in_progress" };
-          return a;
-        }),
-      );
-      bumpReports();
-      appendReportChunk(0);
-    });
-    schedule(1700, () => pushTool(toolScript[2]));
-    schedule(2000, () => pushTool(toolScript[3]));
-    schedule(2300, () => appendReportChunk(1));
-    schedule(2600, () => bumpLlm());
-    schedule(2900, () => {
-      setAgents((prev) =>
-        prev.map((a, i) => {
-          if (i === 1) return { ...a, status: "completed" };
-          if (i === 2) return { ...a, status: "in_progress" };
-          return a;
-        }),
-      );
-      bumpReports();
-      appendReportChunk(2);
-    });
-    schedule(3200, () => pushTool(toolScript[4]));
-    schedule(3500, () => appendReportChunk(3));
-    schedule(3900, () => pushTool(toolScript[5]));
-    schedule(4200, () => bumpLlm());
-    schedule(4400, () => appendReportChunk(4));
-    schedule(4800, () => {
-      setAgents((prev) =>
-        prev.map((a, i) => {
-          if (i === 2) return { ...a, status: "completed" };
-          if (i < Math.min(4, totalAgents)) return { ...a, status: "in_progress" };
-          return a;
-        }),
-      );
-      bumpReports();
-    });
-    schedule(5100, () => pushTool(toolScript[6]));
-    schedule(5400, () => appendReportChunk(5));
-    schedule(5800, () => pushTool(toolScript[7]));
-    schedule(6100, () => bumpLlm());
-    schedule(6300, () => appendReportChunk(6));
-    schedule(6700, () => {
-      setAgents((prev) =>
-        prev.map((a) =>
-          a.status === "in_progress" ? { ...a, status: "completed" } : a,
-        ),
-      );
-      bumpReports();
-    });
-    schedule(7000, () => appendReportChunk(7));
-    schedule(7300, () => {
-      // Mark the rest as completed so the dashboard reads "done" before exiting
-      setAgents((prev) => prev.map((a) => ({ ...a, status: "completed" })));
-      setReports(totalReports);
-    });
-    schedule(7900, () => {
-      if (completedRef.current) return;
-      completedRef.current = true;
-      onComplete();
-    });
+    const handle = openAgentStream(runId, handler);
+    return () => handle.close();
+  }, [runId, locked]);
 
-    function pushTool(entry: Omit<ToolRow, "time">) {
-      setTools((prev) => [...prev, { ...entry, time: fmtNow(new Date()) }]);
-    }
-    function bumpLlm() {
-      setLlmCalls((c) => c + 1);
-    }
-    function bumpReports() {
-      setReports((r) => Math.min(totalReports, r + 1));
-    }
-    function appendReportChunk(idx: number) {
-      const raw = REPORT_CHUNKS[idx];
-      if (!raw) return;
-      const chunk = raw.replace(/{SYMBOL}/g, symbol).replace(/{DATE}/g, date);
-      setReport((prev) => prev + chunk);
-    }
-
-    return () => {
-      window.clearInterval(tickHandle);
-      timeouts.forEach((id) => window.clearTimeout(id));
-    };
-  }, [locked, done, onComplete, symbol, date, toolScript, totalAgents]);
-
-  const tone = done ? "muted" : locked ? "muted" : "accent";
   const completedAgents = agents.filter((a) => a.status === "completed").length;
-  const toolsCount = tools.filter((t) => t.type === "Tool").length;
+  const reportEntries = Object.entries(reports).filter(
+    ([k, v]) => expectedSections.includes(k) && v && v.trim(),
+  );
+  const reportsDone = reportEntries.length;
+
+  const activeReport = activeSection
+    ? reports[activeSection]
+    : reportEntries.at(-1)?.[1];
+  const activeTitle = activeSection
+    ? SECTION_TITLE[activeSection] ?? activeSection
+    : reportEntries.at(-1)?.[0];
+
+  const tone = done ? "muted" : locked ? "muted" : error ? "warn" : "accent";
 
   return (
     <BoxPanel title="Step 09 · Pipeline Runtime" tone={tone}>
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-1">
           <p className="display text-[18px] tracking-tight">
-            {done ? "Pipeline complete." : "Welcome to TradingAgents."}
+            {runStatus === "done"
+              ? "Pipeline complete."
+              : runStatus === "error"
+                ? "Pipeline failed."
+                : "Welcome to TradingAgents."}
           </p>
           <p className="text-[13px] text-[var(--color-text-dim)]">
-            {done
-              ? "All analyst, research, trader, and risk agents have settled."
-              : `Live multi-agent run for ${symbol} · session ${date}. Streams advance automatically.`}
+            {runId
+              ? `Live multi-agent run for ${symbol} · session ${date}. Run ${runId}.`
+              : "Awaiting run handshake…"}
           </p>
+          {error ? (
+            <p
+              className="mono mt-2 text-[12px]"
+              style={{ color: "var(--color-warn)" }}
+            >
+              ! {error}
+            </p>
+          ) : null}
         </div>
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <ProgressPanel agents={agents} />
-          <MessagesPanel rows={tools} />
+          <MessagesPanel rows={messages} />
         </div>
 
-        <CurrentReportPanel report={report} />
+        <CurrentReportPanel report={activeReport ?? ""} title={activeTitle} />
 
         <StatusFooter
           agentsDone={completedAgents}
-          agentsTotal={totalAgents}
-          llm={llmCalls}
-          tools={toolsCount}
-          tokensUp={tokensUp}
-          tokensDown={tokensDown}
-          reports={reports}
-          totalReports={totalReports}
+          agentsTotal={agents.length}
+          llm={stats.llm_calls}
+          tools={stats.tool_calls}
+          tokensUp={stats.tokens_in}
+          tokensDown={stats.tokens_out}
+          reports={reportsDone}
+          totalReports={expectedSections.length}
           elapsed={elapsed}
-          done={done}
+          done={runStatus === "done"}
         />
       </div>
     </BoxPanel>
@@ -342,7 +336,7 @@ function ProgressPanel({ agents }: { agents: AgentRow[] }) {
                 i === 0 || a.team !== agents[i - 1]?.team ? a.team : "";
               return (
                 <tr
-                  key={`${a.code}-${i}`}
+                  key={`${a.agent}-${i}`}
                   className="border-t border-dashed border-[var(--color-line)] align-top"
                 >
                   <td className="px-3 py-1.5 text-[var(--color-text-dim)]">
@@ -366,9 +360,10 @@ function ProgressPanel({ agents }: { agents: AgentRow[] }) {
 
 function StatusPill({ status }: { status: AgentStatus }) {
   if (status === "completed") {
-    return (
-      <span style={{ color: "var(--color-ok)" }}>completed</span>
-    );
+    return <span style={{ color: "var(--color-ok)" }}>completed</span>;
+  }
+  if (status === "error") {
+    return <span style={{ color: "var(--color-warn)" }}>error</span>;
   }
   if (status === "in_progress") {
     return (
@@ -385,18 +380,10 @@ function StatusPill({ status }: { status: AgentStatus }) {
       </span>
     );
   }
-  return (
-    <span style={{ color: "var(--color-text-faint)" }}>pending</span>
-  );
+  return <span style={{ color: "var(--color-text-faint)" }}>pending</span>;
 }
 
-function MessagesPanel({ rows }: { rows: ToolRow[] }) {
-  const scrollRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [rows]);
+function MessagesPanel({ rows }: { rows: MsgRow[] }) {
   return (
     <div className="border border-[var(--color-line)] bg-[var(--color-bg)]">
       <div className="border-b border-[var(--color-line)] bg-[var(--color-surface-2)] px-3 py-2">
@@ -407,7 +394,7 @@ function MessagesPanel({ rows }: { rows: ToolRow[] }) {
           Messages & Tools
         </span>
       </div>
-      <div ref={scrollRef} className="max-h-[260px] overflow-y-auto">
+      <div className="max-h-[260px] overflow-y-auto">
         {rows.length === 0 ? (
           <div className="mono px-3 py-4 text-[12px] text-[var(--color-text-faint)]">
             · awaiting first tool dispatch…
@@ -430,7 +417,7 @@ function MessagesPanel({ rows }: { rows: ToolRow[] }) {
             <tbody>
               {rows.map((r, i) => (
                 <tr
-                  key={i}
+                  key={`${r.time}-${i}`}
                   className="border-t border-dashed border-[var(--color-line)] align-top"
                 >
                   <td className="px-3 py-1.5 text-[var(--color-text-dim)]">
@@ -442,7 +429,7 @@ function MessagesPanel({ rows }: { rows: ToolRow[] }) {
                         color:
                           r.type === "Tool"
                             ? "var(--color-accent)"
-                            : r.type === "LLM"
+                            : r.type === "Agent" || r.type === "LLM"
                               ? "var(--color-ok)"
                               : "var(--color-text-dim)",
                       }}
@@ -451,7 +438,9 @@ function MessagesPanel({ rows }: { rows: ToolRow[] }) {
                     </span>
                   </td>
                   <td className="break-words px-3 py-1.5 text-[var(--color-text)]">
-                    {r.content}
+                    {r.content.length > 220
+                      ? r.content.slice(0, 217) + "…"
+                      : r.content}
                   </td>
                 </tr>
               ))}
@@ -463,33 +452,82 @@ function MessagesPanel({ rows }: { rows: ToolRow[] }) {
   );
 }
 
-function CurrentReportPanel({ report }: { report: string }) {
+function CurrentReportPanel({ report, title }: { report: string; title?: string }) {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [mode, setMode] = useState<ReportRenderMode>("markdown");
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [report]);
   return (
     <div className="border border-[var(--color-line)] bg-[var(--color-bg)]">
-      <div className="border-b border-[var(--color-line)] bg-[var(--color-surface-2)] px-3 py-2">
-        <span
-          className="mono text-[10px] uppercase tracking-[0.24em]"
-          style={{ color: "var(--color-accent)" }}
-        >
-          Current Report
-        </span>
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--color-line)] bg-[var(--color-surface-2)] px-3 py-2">
+        <div className="flex items-center gap-3">
+          <span
+            className="mono text-[10px] uppercase tracking-[0.24em]"
+            style={{ color: "var(--color-accent)" }}
+          >
+            Current Report
+          </span>
+          {title ? (
+            <span
+              className="mono text-[10px] uppercase tracking-[0.2em] text-[var(--color-text-dim)]"
+            >
+              {title}
+            </span>
+          ) : null}
+        </div>
+        <RenderModeToggle mode={mode} onChange={setMode} />
       </div>
-      <div className="max-h-[320px] overflow-y-auto px-4 py-3">
-        {report.length === 0 ? (
+      <div ref={scrollRef} className="max-h-[320px] overflow-y-auto px-4 py-3">
+        {!report ? (
           <p className="mono text-[12px] text-[var(--color-text-faint)]">
             · waiting for first analyst draft…
           </p>
+        ) : mode === "markdown" ? (
+          <Markdown>{report}</Markdown>
         ) : (
           <pre className="whitespace-pre-wrap font-mono text-[12.5px] leading-[1.55] text-[var(--color-text)]">
             {report}
-            <span
-              aria-hidden
-              className="ml-0.5 inline-block h-[1em] w-[0.55ch] -translate-y-[2px] animate-pulse"
-              style={{ background: "var(--color-accent)" }}
-            />
           </pre>
         )}
       </div>
+    </div>
+  );
+}
+
+function RenderModeToggle({
+  mode,
+  onChange,
+}: {
+  mode: ReportRenderMode;
+  onChange: (mode: ReportRenderMode) => void;
+}) {
+  return (
+    <div
+      className="mono flex items-stretch overflow-hidden border border-[var(--color-line)] text-[10px] uppercase tracking-[0.2em]"
+      role="group"
+      aria-label="Report render mode"
+    >
+      {(["markdown", "raw"] as ReportRenderMode[]).map((m) => {
+        const active = mode === m;
+        return (
+          <button
+            key={m}
+            type="button"
+            onClick={() => onChange(m)}
+            aria-pressed={active}
+            className="px-2 py-1 transition-colors"
+            style={{
+              background: active ? "var(--color-accent)" : "transparent",
+              color: active ? "var(--color-bg)" : "var(--color-text-dim)",
+            }}
+          >
+            {m}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -521,19 +559,14 @@ function StatusFooter({
     { label: "Agents", value: `${agentsDone}/${agentsTotal}` },
     { label: "LLM", value: String(llm) },
     { label: "Tools", value: String(tools) },
-    {
-      label: "Tokens",
-      value: `${formatTokens(tokensUp)}↑ ${formatTokens(tokensDown)}↓`,
-    },
+    { label: "Tokens", value: `${formatTokens(tokensUp)}↑ ${formatTokens(tokensDown)}↓` },
     { label: "Reports", value: `${reports}/${totalReports}` },
     { label: "⏱", value: fmtClock(elapsed) },
   ];
   return (
     <div
       className="mono flex flex-wrap items-center gap-x-4 gap-y-1 border border-dashed border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-2 text-[12px]"
-      style={{
-        color: done ? "var(--color-ok)" : "var(--color-text-dim)",
-      }}
+      style={{ color: done ? "var(--color-ok)" : "var(--color-text-dim)" }}
     >
       {segments.map((s, i) => (
         <span key={s.label} className="inline-flex items-center gap-2">
@@ -548,9 +581,4 @@ function StatusFooter({
       ))}
     </div>
   );
-}
-
-function formatTokens(n: number) {
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
-  return String(n);
 }

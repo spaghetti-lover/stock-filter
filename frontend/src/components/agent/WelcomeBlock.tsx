@@ -1,5 +1,9 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { AsciiBanner } from "./AsciiBanner";
 import { BoxPanel } from "./BoxPanel";
+import { fetchAnnouncements } from "@/lib/tradingAgent";
 
 const STEPS = [
   { numeral: "I", label: "Analyst Team" },
@@ -10,6 +14,24 @@ const STEPS = [
 ];
 
 export function WelcomeBlock() {
+  const [announcements, setAnnouncements] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAnnouncements()
+      .then((data) => {
+        if (cancelled) return;
+        setAnnouncements(data.announcements ?? []);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setAnnouncements([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <div className="flex flex-col gap-8">
       <BoxPanel title="Welcome · TradingAgents" tone="accent">
@@ -52,28 +74,21 @@ export function WelcomeBlock() {
 
       <BoxPanel title="Announcements" tone="muted">
         <div className="flex flex-col gap-2">
-          <p className="text-[13px] text-[var(--color-text-dim)]">
-            For more information please visit{" "}
-            <a
-              href="https://github.com/spaghetti-lover/stock-filter.git"
-              target="_blank"
-              rel="noreferrer"
-              className="md-a"
-            >
-              github.com/spaghetti-lover/stock-filter.git
-            </a>
-          </p>
-          <p className="text-[13px] text-[var(--color-text-dim)]">
-            Trading-R1 Technical Report:{" "}
-            <a
-              href="https://arxiv.org/abs/2509.11420"
-              target="_blank"
-              rel="noreferrer"
-              className="md-a"
-            >
-              arxiv.org/abs/2509.11420
-            </a>
-          </p>
+          {announcements === null ? (
+            <p className="mono text-[12px] text-[var(--color-text-faint)]">
+              · fetching announcements…
+            </p>
+          ) : announcements.length === 0 ? (
+            <p className="mono text-[12px] text-[var(--color-text-faint)]">
+              · no announcements
+            </p>
+          ) : (
+            announcements.map((line, i) => (
+              <p key={i} className="text-[13px] text-[var(--color-text-dim)]">
+                {line}
+              </p>
+            ))
+          )}
         </div>
       </BoxPanel>
     </div>

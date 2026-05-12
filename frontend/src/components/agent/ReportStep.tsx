@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BoxPanel } from "./BoxPanel";
+import { saveRunReport } from "@/lib/tradingAgent";
 
 interface Props {
+  runId: string | null;
   symbol: string;
   date: string;
   locked?: boolean;
@@ -17,9 +19,11 @@ export interface ReportAnswers {
   saveReport: boolean;
   savePath: string;
   displayReport: boolean;
+  savedTo?: string | null;
+  saveError?: string | null;
 }
 
-type SubStep = "save" | "path" | "display" | "done";
+type SubStep = "save" | "path" | "saving" | "display" | "done";
 
 const YN_RE = /^(y|yes|n|no)?$/i;
 
@@ -37,6 +41,7 @@ function fmtTimestamp(d: Date) {
 }
 
 export function ReportStep({
+  runId,
   symbol,
   date,
   locked = false,
@@ -52,7 +57,7 @@ export function ReportStep({
     const dd = String(d.getDate()).padStart(2, "0");
     return `${yyyy}${mm}${dd}_${fmtTimestamp(d)}`;
   }, []);
-  const defaultPath = `/home/appuser/app/reports/${symbol}_${sessionStamp}`;
+  const defaultPath = `reports/${symbol}_${sessionStamp}`;
 
   const [sub, setSub] = useState<SubStep>(value ? "done" : "save");
   const [saveReport, setSaveReport] = useState<boolean | null>(
@@ -61,6 +66,8 @@ export function ReportStep({
   const [savePath, setSavePath] = useState<string | null>(
     value ? value.savePath : null,
   );
+  const [savedTo, setSavedTo] = useState<string | null>(value?.savedTo ?? null);
+  const [saveError, setSaveError] = useState<string | null>(value?.saveError ?? null);
   const [displayReport, setDisplayReport] = useState<boolean | null>(
     value ? value.displayReport : null,
   );
@@ -71,7 +78,7 @@ export function ReportStep({
 
   useEffect(() => {
     if (locked) return;
-    if (sub === "done") return;
+    if (sub === "done" || sub === "saving") return;
     inputRef.current?.focus();
   }, [locked, sub]);
 
@@ -88,7 +95,6 @@ export function ReportStep({
     const v = parseYn(draft, true);
     setSaveReport(v);
     if (!v) {
-      // skip path prompt
       setSavePath("");
       setSub("display");
     } else {
@@ -96,10 +102,24 @@ export function ReportStep({
     }
   };
 
-  const advancePath = () => {
+  const advancePath = async () => {
     const v = draft.trim() || defaultPath;
     setSavePath(v);
-    setSub("display");
+    setSub("saving");
+    if (!runId) {
+      setSaveError("no run id");
+      setSub("display");
+      return;
+    }
+    try {
+      const result = await saveRunReport(runId, v);
+      setSavedTo(result.saved_to);
+      setSaveError(null);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "save failed");
+    } finally {
+      setSub("display");
+    }
   };
 
   const advanceDisplay = () => {
@@ -114,6 +134,8 @@ export function ReportStep({
       saveReport: saveReport ?? true,
       savePath: savePath ?? "",
       displayReport: v,
+      savedTo,
+      saveError,
     });
   };
 
@@ -164,6 +186,14 @@ export function ReportStep({
               dim
             />
           ) : null}
+          {sub === "saving" ? (
+            <p
+              className="mono text-[12px]"
+              style={{ color: "var(--color-accent)" }}
+            >
+              · saving report on server…
+            </p>
+          ) : null}
           {sub === "done" || displayReport !== null ? (
             <TranscriptLine
               prompt="Display full report on screen?"
@@ -172,7 +202,7 @@ export function ReportStep({
             />
           ) : null}
 
-          {sub !== "done" && !locked ? (
+          {sub !== "done" && sub !== "saving" && !locked ? (
             <ActivePrompt
               label={
                 sub === "save"
@@ -216,7 +246,22 @@ export function ReportStep({
 
         {sub === "done" ? (
           <div className="flex flex-col gap-3 border border-dashed border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-3">
-            {saveReport && savePath ? (
+            {saveError ? (
+              <p
+                className="mono text-[12px]"
+                style={{ color: "var(--color-warn)" }}
+              >
+                ! save failed: {saveError}
+              </p>
+            ) : savedTo ? (
+              <p
+                className="mono text-[12px]"
+                style={{ color: "var(--color-ok)" }}
+              >
+                ✓ Report saved to:{" "}
+                <span className="text-[var(--color-text)]">{savedTo}</span>
+              </p>
+            ) : saveReport && savePath ? (
               <p
                 className="mono text-[12px]"
                 style={{ color: "var(--color-ok)" }}
@@ -245,7 +290,7 @@ export function ReportStep({
                 : "· On-screen report skipped"}
             </p>
             <div className="mt-1 flex flex-wrap gap-2">
-              {displayReport && onViewReport ? (
+              {onViewReport ? (
                 <button
                   onClick={onViewReport}
                   className="mono self-start border border-[var(--color-accent)] bg-[var(--color-surface)] px-4 py-2 text-[11px] uppercase tracking-[0.2em] transition-colors hover:bg-[var(--color-accent)] hover:text-black"
