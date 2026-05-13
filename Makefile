@@ -21,8 +21,8 @@ migrate:
 		./db/migrations
 
 migrate_prod:
-	docker exec -i stock-filter-db-stock-data-1 \
-		sh -c "cd /app && uv run yoyo apply --no-config-file \
+	docker exec -i stock-filter-backend-1 \
+		sh -c "cd /app/backend && /app/.venv/bin/yoyo apply --no-config-file \
 		--database 'postgresql://postgres:password@db-stock-data:5432/stock_data' \
 		./db/migrations"
 
