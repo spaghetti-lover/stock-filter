@@ -1,7 +1,6 @@
 // Thin client around the trading-agent endpoints, served by the main backend.
 
-export const TRADING_AGENT_BASE =
-  process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
+export const TRADING_AGENT_BASE = "/api";
 
 export interface CatalogChoice {
   label: string;

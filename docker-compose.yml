@@ -17,8 +17,8 @@ services:
     build: .
     command: python3 -B -m uvicorn main:app --host 0.0.0.0 --port 8000
     working_dir: /app/backend
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     env_file:
       - backend/.env
     environment:
@@ -33,38 +33,14 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      args:
-        NEXT_PUBLIC_BACKEND_URL: http://localhost:8000
     image: stock-filter-frontend:prod
     container_name: stock-filter-frontend-prod
     ports:
       - "3000:3000"
-    depends_on:
-      - backend
-
-  frontend-dev:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile.dev
-    image: stock-filter-frontend:dev
-    container_name: stock-filter-frontend-dev
-    ports:
-      - "3000:3000"
     environment:
-      - WATCHPACK_POLLING=true
-      - NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
+      BACKEND_URL: http://backend:8000
     depends_on:
       - backend
-    develop:
-      watch:
-        - action: sync
-          path: ./frontend
-          target: /app
-          ignore:
-            - node_modules/
-            - .next/
-        - action: rebuild
-          path: ./frontend/package.json
 
 volumes:
   data-volume:

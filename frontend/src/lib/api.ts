@@ -1,7 +1,6 @@
 import type { ChatMessage, Layer2Response, Provider } from "./types";
 
-export const API_BASE =
-  process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
+export const API_BASE = "/api";
 
 export async function fetchLayer2Latest(): Promise<Layer2Response> {
   const res = await fetch(`${API_BASE}/layer2/latest`, { cache: "no-store" });

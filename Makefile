@@ -1,8 +1,7 @@
 .PHONY: remove_pycache db_start db_stop migrate migrate_prod migrate_rollback db_check frontend backend
 
 remove_pycache:
-	find . -type d -name "__pycache__" -exec rm -r
-{} +
+	find . -type d -name "__pycache__" -exec rm -r {} +
 
 db_start:
 	docker run -d \
