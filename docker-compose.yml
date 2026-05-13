@@ -34,11 +34,11 @@ services:
       context: ./frontend
       args:
         # Browser must hit a URL it can resolve from outside Docker (VPS public IP/domain).
-        NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL:-http://localhost:8000}
+        NEXT_PUBLIC_BACKEND_URL: http://194.34.232.128:8000
     ports:
       - "2222:3000"
     environment:
-      NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL:-http://localhost:8000}
+      NEXT_PUBLIC_BACKEND_URL: http://194.34.232.128:8000
     depends_on:
       - backend
 
