@@ -17,8 +17,8 @@ services:
     build: .
     command: python3 -B -m uvicorn main:app --host 0.0.0.0 --port 8000
     working_dir: /app/backend
-    expose:
-      - "8000"
+    ports:
+      - "8000:8000"
     env_file:
       - backend/.env
     environment:
@@ -29,16 +29,16 @@ services:
       db-stock-data:
         condition: service_healthy
 
-  frontend-prod:
+  frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
-    image: stock-filter-frontend:prod
-    container_name: stock-filter-frontend-prod
+      args:
+        # Browser must hit a URL it can resolve from outside Docker (VPS public IP/domain).
+        NEXT_PUBLIC_BACKEND_URL: http://194.34.232.128:8000
     ports:
-      - "3000:3000"
+      - "2222:3000"
     environment:
-      BACKEND_URL: http://backend:8000
+      NEXT_PUBLIC_BACKEND_URL: http://194.34.232.128:8000
     depends_on:
       - backend
 
