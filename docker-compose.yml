@@ -29,18 +29,42 @@ services:
       db-stock-data:
         condition: service_healthy
 
-  frontend:
+  frontend-prod:
     build:
       context: ./frontend
+      dockerfile: Dockerfile
       args:
-        # Browser must hit a URL it can resolve from outside Docker (VPS public IP/domain).
-        NEXT_PUBLIC_BACKEND_URL: http://194.34.232.128:8000
+        NEXT_PUBLIC_BACKEND_URL: http://localhost:8000
+    image: stock-filter-frontend:prod
+    container_name: stock-filter-frontend-prod
     ports:
-      - "2222:3000"
-    environment:
-      NEXT_PUBLIC_BACKEND_URL: http://194.34.232.128:8000
+      - "3000:3000"
     depends_on:
       - backend
+
+  frontend-dev:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    image: stock-filter-frontend:dev
+    container_name: stock-filter-frontend-dev
+    ports:
+      - "3000:3000"
+    environment:
+      - WATCHPACK_POLLING=true
+      - NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
+    depends_on:
+      - backend
+    develop:
+      watch:
+        - action: sync
+          path: ./frontend
+          target: /app
+          ignore:
+            - node_modules/
+            - .next/
+        - action: rebuild
+          path: ./frontend/package.json
 
 volumes:
   data-volume:
