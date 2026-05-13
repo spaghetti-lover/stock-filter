@@ -22,7 +22,7 @@ migrate:
 
 migrate_prod:
 	docker exec -i stock-filter-backend-1 \
-		sh -c "cd /app/backend && /app/.venv/bin/python3 -m yoyo apply --no-config-file \
+		sh -c "cd /app/backend && PYTHONPATH=/app/.venv/lib/python3.13/site-packages python3 -m yoyo apply --no-config-file \
 		--database 'postgresql://postgres:password@db-stock-data:5432/stock_data' \
 		./db/migrations"
 
