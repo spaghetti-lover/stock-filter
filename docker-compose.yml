@@ -1,46 +1,49 @@
 services:
-  db-stock-data:
-    image: postgres:14-alpine
+  db:
+    image: postgres:16-alpine
+    container_name: stock-db
+    restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
       POSTGRES_DB: stock_data
     volumes:
-      - data-volume:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d stock_data"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 5
 
   backend:
-    build: .
-    command: python3 -B -m uvicorn main:app --host 0.0.0.0 --port 8000
-    working_dir: /app/backend
-    ports:
-      - "8000:8000"
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: stock-backend
+    restart: unless-stopped
     env_file:
       - backend/.env
     environment:
-      DATABASE_URL: postgresql://postgres:password@db-stock-data:5432/stock_data?sslmode=disable
-    volumes:
-      - ~/.vnstock:/root/.vnstock:ro
+      DATABASE_URL: postgresql://postgres:password@db:5432/stock_data
+      CORS_ALLOW_ORIGINS: "${CORS_ALLOW_ORIGINS:-http://localhost:3000}"
+    ports:
+      - "8000:8000"
     depends_on:
-      db-stock-data:
+      db:
         condition: service_healthy
 
   frontend:
     build:
       context: ./frontend
+      dockerfile: Dockerfile
       args:
-        # Browser must hit a URL it can resolve from outside Docker (VPS public IP/domain).
-        NEXT_PUBLIC_BACKEND_URL: http://194.34.232.128:8000
+        NEXT_PUBLIC_BACKEND_URL: "${NEXT_PUBLIC_BACKEND_URL:-http://localhost:8000}"
+    container_name: stock-frontend
+    restart: unless-stopped
     ports:
-      - "2222:3000"
-    environment:
-      NEXT_PUBLIC_BACKEND_URL: http://194.34.232.128:8000
+      - "3000:3000"
     depends_on:
       - backend
 
 volumes:
-  data-volume:
+  pgdata:

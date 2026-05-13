@@ -1,8 +1,10 @@
 __pycache__
 *.pyc
-venv
-.env
+*.pyo
 .git
+.env
+backend/.env
 docs
-home
 *.log
+frontend/node_modules
+frontend/.next

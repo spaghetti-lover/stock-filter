@@ -1,4 +1,5 @@
-.PHONY: remove_pycache db_start db_stop migrate migrate_prod migrate_rollback db_check frontend backend
+.PHONY: remove_pycache db_start db_stop migrate migrate_prod migrate_rollback db_check frontend backend \
+        up down build logs ps
 
 remove_pycache:
 	find . -type d -name "__pycache__" -exec rm -r {} +
@@ -21,9 +22,9 @@ migrate:
 		./db/migrations
 
 migrate_prod:
-	docker exec -i stock-filter-backend-1 \
-		sh -c "cd /app/backend && PYTHONPATH=/app/.venv/lib/python3.13/site-packages python3 -m yoyo apply --no-config-file \
-		--database 'postgresql://postgres:password@db-stock-data:5432/stock_data' \
+	docker exec -i stock-backend \
+		sh -c "python3 -B -m yoyo apply --no-config-file \
+		--database 'postgresql://postgres:password@db:5432/stock_data' \
 		./db/migrations"
 
 migrate_rollback:
@@ -45,3 +46,19 @@ frontend_build:
 
 backend:
 	cd backend && uv run uvicorn main:app
+
+# Docker Compose (production)
+up:
+	docker compose up -d
+
+down:
+	docker compose down
+
+build:
+	docker compose build
+
+logs:
+	docker compose logs -f
+
+ps:
+	docker compose ps
