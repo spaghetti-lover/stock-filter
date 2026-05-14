@@ -40,7 +40,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-_default_origins = "http://localhost:3000,http://localhost:2222"
+_default_origins = "http://localhost:3000"
 _allow_origins = [
     o.strip() for o in os.environ.get("CORS_ALLOW_ORIGINS", _default_origins).split(",") if o.strip()
 ]

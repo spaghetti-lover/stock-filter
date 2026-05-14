@@ -12,9 +12,13 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    networks:
+      - app-network
 
   backend:
-    build: .
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     command: python3 -B -m uvicorn main:app --host 0.0.0.0 --port 8000
     working_dir: /app/backend
     ports:
@@ -28,19 +32,24 @@ services:
     depends_on:
       db-stock-data:
         condition: service_healthy
+    networks:
+      - app-network
 
   frontend:
     build:
       context: ./frontend
-      args:
-        # Browser must hit a URL it can resolve from outside Docker (VPS public IP/domain).
-        NEXT_PUBLIC_BACKEND_URL: http://194.34.232.128:8000
     ports:
-      - "2222:3000"
+      - "3000:3000"
     environment:
-      NEXT_PUBLIC_BACKEND_URL: http://194.34.232.128:8000
+      BACKEND_URL: http://backend:8000
     depends_on:
       - backend
+    networks:
+      - app-network
 
 volumes:
   data-volume:
+
+networks:
+  app-network:
+    driver: bridge

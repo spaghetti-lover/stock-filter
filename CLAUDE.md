@@ -43,7 +43,7 @@ Clean Architecture with four layers:
   - `container.py` — Composition root (DI wiring)
 - **Presentation** (`backend/presentation/api/routes/`) — FastAPI routes: `GET /layer1` (cached), `GET /layer1/stream` (live SSE), `GET /layer2` (stub), `POST /crawl/trigger`, `GET /crawl/status`, `POST /chat`
 
-Frontend (`frontend/`) is a Next.js (App Router, React 19, TypeScript) app served by Bun. State: Zustand store (`src/lib/store.ts`) persists `lastStocks` so Layer 1 results flow into the chat page as `stocks_context`. Layer 2 weighting is recomputed client-side (`src/lib/scoring.ts` is a verbatim port of the Streamlit `recompute_scores` function — numerical parity is required). Browser requests use `NEXT_PUBLIC_BACKEND_URL` (default `http://localhost:8000`). The backend enables CORS via `CORS_ALLOW_ORIGINS` env (defaults to `http://localhost:3000,http://localhost:2222`).
+Frontend (`frontend/`) is a Next.js (App Router, React 19, TypeScript) app served by Bun. State: Zustand store (`src/lib/store.ts`) persists `lastStocks` so Layer 1 results flow into the chat page as `stocks_context`. Layer 2 weighting is recomputed client-side (`src/lib/scoring.ts` is a verbatim port of the Streamlit `recompute_scores` function — numerical parity is required). Browser requests use `NEXT_PUBLIC_BACKEND_URL` (default `http://localhost:8000`). The backend enables CORS via `CORS_ALLOW_ORIGINS` env (defaults to `http://localhost:3000`).
 
 ### Data Flow
 
