@@ -11,6 +11,7 @@ from infrastructure.mcp.data import mcp as _data_mcp
 from infrastructure.mcp.news import mcp as _news_mcp
 from infrastructure.mcp.fundamentals import mcp as _fundamentals_mcp
 from infrastructure.mcp.indicators import mcp as _indicators_mcp
+from infrastructure.mcp.youtube import mcp as _youtube_mcp
 
 
 SERVER_INSTANCES: dict[str, FastMCP] = {
@@ -18,6 +19,7 @@ SERVER_INSTANCES: dict[str, FastMCP] = {
     "news": _news_mcp,
     "fundamentals": _fundamentals_mcp,
     "indicators": _indicators_mcp,
+    "youtube": _youtube_mcp,
 }
 
 
@@ -41,4 +43,6 @@ CATALOG: dict[str, str] = {
     "get_balance_sheet": "fundamentals",
     "get_cashflow": "fundamentals",
     "get_income_statement": "fundamentals",
+    # youtube
+    "get_youtube_transcript": "youtube",
 }

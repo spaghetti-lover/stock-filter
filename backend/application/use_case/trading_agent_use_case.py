@@ -38,6 +38,7 @@ SECTION_TITLE = {
     "sentiment_report": "Social Sentiment",
     "news_report": "News Analysis",
     "fundamentals_report": "Fundamentals Analysis",
+    "youtube_report": "YouTube Analysis",
     "investment_plan": "Research Team Decision",
     "trader_investment_plan": "Trading Team Plan",
     "final_trade_decision": "Portfolio Management Decision",
@@ -233,7 +234,8 @@ async def _run_pipeline_async(run: Run, tool_registry: McpToolRegistry) -> None:
     buffer.update_agent_status(first_analyst, "in_progress")
 
     init_state = graph.propagator.create_initial_state(
-        run.config["ticker"], run.config["analysis_date"]
+        run.config["ticker"], run.config["analysis_date"],
+        youtube_urls=run.config.get("youtube_urls", []),
     )
     args = graph.propagator.get_graph_args(callbacks=[handler])
 

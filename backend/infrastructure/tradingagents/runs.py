@@ -26,6 +26,7 @@ _ANALYST_AGENT_NAMES = {
     "social": "Social Analyst",
     "news": "News Analyst",
     "fundamentals": "Fundamentals Analyst",
+    "youtube": "Youtube Analyst",
 }
 _FIXED_TEAMS = {
     "Research Team": ["Bull Researcher", "Bear Researcher", "Research Manager"],
@@ -38,6 +39,7 @@ _REPORT_SECTIONS = [
     "sentiment_report",
     "news_report",
     "fundamentals_report",
+    "youtube_report",
     "investment_plan",
     "trader_investment_plan",
     "final_trade_decision",
@@ -47,6 +49,7 @@ _REPORT_SECTION_ANALYST = {
     "sentiment_report": "social",
     "news_report": "news",
     "fundamentals_report": "fundamentals",
+    "youtube_report": "youtube",
 }
 
 

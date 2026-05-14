@@ -17,6 +17,7 @@ class StartRunRequest(BaseModel):
     openai_reasoning_effort: str | None = None
     anthropic_effort: str | None = None
     checkpoint_enabled: bool = False
+    youtube_urls: list[str] | None = None
 
 
 class StartRunResponse(BaseModel):

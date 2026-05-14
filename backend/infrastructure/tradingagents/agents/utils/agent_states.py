@@ -49,6 +49,9 @@ class AgentState(MessagesState):
 
     sender: Annotated[str, "Agent that sent this message"]
 
+    # youtube analyst inputs
+    youtube_urls: Annotated[list[str], "YouTube video URLs provided by user for analysis"]
+
     # research step
     market_report: Annotated[str, "Report from the Market Analyst"]
     sentiment_report: Annotated[str, "Report from the Social Media Analyst"]
@@ -56,6 +59,7 @@ class AgentState(MessagesState):
         str, "Report from the News Researcher of current world affairs"
     ]
     fundamentals_report: Annotated[str, "Report from the Fundamentals Researcher"]
+    youtube_report: Annotated[str, "Report from the YouTube Analyst"]
 
     # researcher team discussion step
     investment_debate_state: Annotated[

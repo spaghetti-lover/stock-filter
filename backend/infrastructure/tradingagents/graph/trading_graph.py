@@ -28,6 +28,7 @@ from infrastructure.tools import (
     McpToolRegistry,
     NEWS_ANALYST,
     SOCIAL_ANALYST,
+    YOUTUBE_ANALYST,
     ToolSet,
 )
 from infrastructure.market_data.data import get_trading_history, get_vnindex_history
@@ -45,6 +46,7 @@ ANALYST_TOOLSETS: Dict[str, ToolSet] = {
     "social": SOCIAL_ANALYST,
     "news": NEWS_ANALYST,
     "fundamentals": FUNDAMENTALS_ANALYST,
+    "youtube": YOUTUBE_ANALYST,
 }
 
 

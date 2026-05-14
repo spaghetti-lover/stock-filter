@@ -76,6 +76,13 @@ class GraphSetup:
             delete_nodes["fundamentals"] = create_msg_delete()
             tool_nodes["fundamentals"] = self.tool_nodes["fundamentals"]
 
+        if "youtube" in selected_analysts:
+            analyst_nodes["youtube"] = create_youtube_analyst(
+                self.quick_thinking_llm, self.tool_lists["youtube"]
+            )
+            delete_nodes["youtube"] = create_msg_delete()
+            tool_nodes["youtube"] = self.tool_nodes["youtube"]
+
         # Create researcher and manager nodes
         bull_researcher_node = create_bull_researcher(self.quick_thinking_llm)
         bear_researcher_node = create_bear_researcher(self.quick_thinking_llm)

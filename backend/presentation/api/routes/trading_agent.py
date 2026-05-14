@@ -130,6 +130,7 @@ async def run(request: StartRunRequest, fastapi_request: Request) -> StartRunRes
         "openai_reasoning_effort": request.openai_reasoning_effort,
         "anthropic_effort": request.anthropic_effort,
         "checkpoint_enabled": request.checkpoint_enabled,
+        "youtube_urls": request.youtube_urls or [],
     }
 
     tool_registry = fastapi_request.app.state.tool_registry

@@ -41,6 +41,7 @@ const ANALYST_LABEL: Record<string, string> = {
   social: "Social Analyst",
   news: "News Analyst",
   fundamentals: "Fundamentals Analyst",
+  youtube: "Youtube Analyst",
 };
 
 const FIXED_TEAMS: Record<string, string[]> = {
@@ -55,6 +56,7 @@ const SECTION_TITLE: Record<string, string> = {
   sentiment_report: "Social Sentiment",
   news_report: "News Analysis",
   fundamentals_report: "Fundamentals Analysis",
+  youtube_report: "YouTube Analysis",
   investment_plan: "Research Team Decision",
   trader_investment_plan: "Trading Team Plan",
   final_trade_decision: "Portfolio Management Decision",
@@ -65,6 +67,7 @@ const SECTION_ANALYST_GATE: Record<string, string> = {
   sentiment_report: "social",
   news_report: "news",
   fundamentals_report: "fundamentals",
+  youtube_report: "youtube",
 };
 
 function buildInitialAgents(analystCodes: string[]): AgentRow[] {

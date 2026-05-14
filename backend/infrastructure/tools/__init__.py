@@ -7,6 +7,7 @@ from infrastructure.tools.toolset import (
     MARKET_ANALYST,
     NEWS_ANALYST,
     SOCIAL_ANALYST,
+    YOUTUBE_ANALYST,
     ToolSet,
 )
 from infrastructure.tools.registry import McpToolRegistry
@@ -20,5 +21,6 @@ __all__ = [
     "FUNDAMENTALS_ANALYST",
     "NEWS_ANALYST",
     "SOCIAL_ANALYST",
+    "YOUTUBE_ANALYST",
     "McpToolRegistry",
 ]

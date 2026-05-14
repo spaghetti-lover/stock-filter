@@ -31,6 +31,7 @@ class MessageBuffer:
         "social": "Social Analyst",
         "news": "News Analyst",
         "fundamentals": "Fundamentals Analyst",
+        "youtube": "Youtube Analyst",
     }
 
     REPORT_SECTIONS = {
@@ -38,6 +39,7 @@ class MessageBuffer:
         "sentiment_report": ("social", "Social Analyst"),
         "news_report": ("news", "News Analyst"),
         "fundamentals_report": ("fundamentals", "Fundamentals Analyst"),
+        "youtube_report": ("youtube", "Youtube Analyst"),
         "investment_plan": (None, "Research Manager"),
         "trader_investment_plan": (None, "Trader"),
         "final_trade_decision": (None, "Portfolio Manager"),
@@ -48,6 +50,7 @@ class MessageBuffer:
         "sentiment_report": "Social Sentiment",
         "news_report": "News Analysis",
         "fundamentals_report": "Fundamentals Analysis",
+        "youtube_report": "YouTube Analysis",
         "investment_plan": "Research Team Decision",
         "trader_investment_plan": "Trading Team Plan",
         "final_trade_decision": "Portfolio Management Decision",
@@ -118,7 +121,7 @@ class MessageBuffer:
             self.current_report = f"### {self.SECTION_TITLES[latest_section]}\n{latest_content}"
 
         parts: list[str] = []
-        analyst_sections = ["market_report", "sentiment_report", "news_report", "fundamentals_report"]
+        analyst_sections = ["market_report", "sentiment_report", "news_report", "fundamentals_report", "youtube_report"]
         if any(self.report_sections.get(s) for s in analyst_sections):
             parts.append("## Analyst Team Reports")
             for section in analyst_sections:
@@ -141,18 +144,20 @@ class MessageBuffer:
         self.final_report = "\n\n".join(parts) if parts else None
 
 
-_ANALYST_ORDER = ["market", "social", "news", "fundamentals"]
+_ANALYST_ORDER = ["market", "social", "news", "fundamentals", "youtube"]
 _ANALYST_AGENT_NAMES = {
     "market": "Market Analyst",
     "social": "Social Analyst",
     "news": "News Analyst",
     "fundamentals": "Fundamentals Analyst",
+    "youtube": "Youtube Analyst",
 }
 _ANALYST_REPORT_MAP = {
     "market": "market_report",
     "social": "sentiment_report",
     "news": "news_report",
     "fundamentals": "fundamentals_report",
+    "youtube": "youtube_report",
 }
 
 

@@ -9,6 +9,7 @@ import { MultiChoiceStep } from "@/components/agent/MultiChoiceStep";
 import { ThinkingStep } from "@/components/agent/ThinkingStep";
 import { ReportStep, type ReportAnswers } from "@/components/agent/ReportStep";
 import { RunningStep } from "@/components/agent/RunningStep";
+import { YoutubeUrlsStep } from "@/components/agent/YoutubeUrlsStep";
 import { FullReportOverlay } from "@/components/agent/FullReportOverlay";
 import {
   fetchCatalog,
@@ -40,6 +41,7 @@ const ANALYST_HINTS: Record<string, string> = {
   social: "sentiment, virality, retail mood",
   news: "macro headlines, filings, events",
   fundamentals: "ratios, earnings, balance sheet",
+  youtube: "video transcripts, analyst commentary",
 };
 
 const LANGUAGE_HINTS: Record<string, string> = {
@@ -70,6 +72,7 @@ type StepKey =
   | "date"
   | "language"
   | "analysts"
+  | "youtube_urls"
   | "depth"
   | "provider"
   | "thinking"
@@ -83,6 +86,7 @@ const ORDER: StepKey[] = [
   "date",
   "language",
   "analysts",
+  "youtube_urls",
   "depth",
   "provider",
   "thinking",
@@ -97,6 +101,7 @@ const PROGRESS = [
   { key: "date", label: "Date" },
   { key: "language", label: "Lang" },
   { key: "analysts", label: "Team" },
+  { key: "youtube_urls", label: "Videos" },
   { key: "depth", label: "Depth" },
   { key: "provider", label: "Provider" },
   { key: "thinking", label: "Thinking" },
@@ -110,6 +115,7 @@ const STATUS_LABEL: Record<StepKey, string> = {
   date: "awaiting date",
   language: "awaiting language",
   analysts: "awaiting team",
+  youtube_urls: "awaiting youtube videos",
   depth: "awaiting depth",
   provider: "awaiting provider",
   thinking: "awaiting thinking agents",
@@ -128,6 +134,7 @@ export default function AgentPage() {
   const [date, setDate] = useState<string | null>(null);
   const [language, setLanguage] = useState<{ code: string; label: string } | null>(null);
   const [analysts, setAnalysts] = useState<{ codes: string[]; labels: string[] } | null>(null);
+  const [youtubeUrls, setYoutubeUrls] = useState<string[] | null>(null);
   const [depth, setDepth] = useState<{ code: string; label: string; value: number } | null>(null);
   const [provider, setProvider] = useState<{ code: string; label: string } | null>(null);
   const [thinking, setThinking] = useState<{
@@ -167,6 +174,7 @@ export default function AgentPage() {
     setDate(null);
     setLanguage(null);
     setAnalysts(null);
+    setYoutubeUrls(null);
     setDepth(null);
     setProvider(null);
     setThinking(null);
@@ -268,6 +276,7 @@ export default function AgentPage() {
       openai_reasoning_effort: provider.code === "openai" ? chosen.code : null,
       anthropic_effort: provider.code === "anthropic" ? chosen.code : null,
       backend_url: providerInfo?.backend_url ?? null,
+      youtube_urls: youtubeUrls && youtubeUrls.length > 0 ? youtubeUrls : null,
     };
 
     advance("running");
@@ -390,11 +399,30 @@ export default function AgentPage() {
                 description="Select your LLM analyst agents for the analysis."
                 promptKey="analysts"
                 options={analystChoices}
-                defaultCodes={["market", "social", "news", "fundamentals"]}
+                defaultCodes={["market", "social", "news", "fundamentals", "youtube"]}
                 locked={step !== "analysts"}
                 value={analysts?.codes}
                 onSubmit={(codes, labels) => {
                   setAnalysts({ codes, labels });
+                  if (codes.includes("youtube")) {
+                    advance("youtube_urls");
+                  } else {
+                    advance("depth");
+                  }
+                }}
+              />
+            ) : null}
+
+            {shouldRender("youtube_urls") && analysts?.codes.includes("youtube") ? (
+              <YoutubeUrlsStep
+                locked={step !== "youtube_urls"}
+                value={youtubeUrls ?? undefined}
+                onSubmit={(urls) => {
+                  setYoutubeUrls(urls);
+                  advance("depth");
+                }}
+                onSkip={() => {
+                  setYoutubeUrls([]);
                   advance("depth");
                 }}
               />

@@ -33,6 +33,7 @@ export interface StartRunPayload {
   openai_reasoning_effort?: string | null;
   anthropic_effort?: string | null;
   backend_url?: string | null;
+  youtube_urls?: string[] | null;
 }
 
 export interface StartRunResponse {
@@ -44,6 +45,7 @@ export interface RunReports {
   sentiment_report?: string;
   news_report?: string;
   fundamentals_report?: string;
+  youtube_report?: string;
   investment_plan?: string;
   trader_investment_plan?: string;
   final_trade_decision?: string;

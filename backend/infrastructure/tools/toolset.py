@@ -62,3 +62,5 @@ FUNDAMENTALS_ANALYST = ToolSet(
 NEWS_ANALYST = ToolSet(names=("stock_news", "market_news", "search_news", "trending_topics"))
 
 SOCIAL_ANALYST = ToolSet(names=("stock_news", "search_news"))
+
+YOUTUBE_ANALYST = ToolSet(names=("get_youtube_transcript",))
