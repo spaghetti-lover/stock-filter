@@ -50,7 +50,7 @@ async def get_indicator(symbol: str, indicator: str, days: int = 120) -> dict:
         return {"error": f"unsupported indicator: {indicator}", "supported": list(_SUPPORTED)}
     try:
         return await asyncio.to_thread(compute_indicator, symbol, name, days)
-    except (ValueError, ConnectionError, ConnectionResetError) as e:
+    except (ValueError, ConnectionError, ConnectionResetError, AttributeError) as e:
         return {"error": str(e)}
 
 
