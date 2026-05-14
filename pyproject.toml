@@ -23,8 +23,6 @@ dependencies = [
     "langchain-openai>=0.3.23",
     "langgraph>=0.4.8",
     "langgraph-checkpoint-sqlite>=2.0.0",
-    "yfinance>=0.2.63",
-    "stockstats>=0.6.5",
     "python-dateutil>=2.9.0",
     "parsel>=1.10.0",
     "pytz>=2025.2",
@@ -42,4 +40,6 @@ dependencies = [
     "squarify>=0.4.4",
     "wordcloud>=1.9.6",
     "html2text>=2025.4.15",
+    "langchain-mcp-adapters>=0.2.2",
+    "youtube-transcript-api>=1.2.4",
 ]

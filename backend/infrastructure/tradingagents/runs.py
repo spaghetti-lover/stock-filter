@@ -73,7 +73,7 @@ class Run:
 
     _queue: Optional[asyncio.Queue] = None
     _loop: Optional[asyncio.AbstractEventLoop] = None
-    _thread: Optional[threading.Thread] = None
+    _task: Optional[asyncio.Task] = None
     _subscribers: int = 0
 
 

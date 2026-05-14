@@ -4,10 +4,8 @@ import logging
 import os
 from pathlib import Path
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, Any, Tuple, List, Optional
-
-import yfinance as yf
 
 logger = logging.getLogger(__name__)
 
@@ -23,20 +21,16 @@ from infrastructure.tradingagents.agents.utils.agent_states import (
     InvestDebateState,
     RiskDebateState,
 )
-from infrastructure.tradingagents.dataflows.config import set_config
-
-# Import the new abstract tool methods from agent_utils
-from infrastructure.tradingagents.agents.utils.agent_utils import (
-    get_stock_data,
-    get_indicators,
-    get_fundamentals,
-    get_balance_sheet,
-    get_cashflow,
-    get_income_statement,
-    get_news,
-    get_insider_transactions,
-    get_global_news
+from infrastructure.tradingagents.runtime_config import set_config
+from infrastructure.tools import (
+    FUNDAMENTALS_ANALYST,
+    MARKET_ANALYST,
+    McpToolRegistry,
+    NEWS_ANALYST,
+    SOCIAL_ANALYST,
+    ToolSet,
 )
+from infrastructure.market_data.data import get_trading_history, get_vnindex_history
 
 from .checkpointer import checkpoint_step, clear_checkpoint, get_checkpointer, thread_id
 from .conditional_logic import ConditionalLogic
@@ -44,6 +38,14 @@ from .setup import GraphSetup
 from .propagation import Propagator
 from .reflection import Reflector
 from .signal_processing import SignalProcessor
+
+
+ANALYST_TOOLSETS: Dict[str, ToolSet] = {
+    "market": MARKET_ANALYST,
+    "social": SOCIAL_ANALYST,
+    "news": NEWS_ANALYST,
+    "fundamentals": FUNDAMENTALS_ANALYST,
+}
 
 
 class TradingAgentsGraph:
@@ -55,6 +57,7 @@ class TradingAgentsGraph:
         debug=False,
         config: Dict[str, Any] = None,
         callbacks: Optional[List] = None,
+        tool_registry: Optional[McpToolRegistry] = None,
     ):
         """Initialize the trading agents graph and components.
 
@@ -67,8 +70,14 @@ class TradingAgentsGraph:
         self.debug = debug
         self.config = config or DEFAULT_CONFIG
         self.callbacks = callbacks or []
+        if tool_registry is None:
+            raise ValueError(
+                "TradingAgentsGraph requires a tool_registry. "
+                "Resolve it from app.state.tool_registry in the route layer."
+            )
+        self.tool_registry = tool_registry
 
-        # Update the interface's config
+        # Update the runtime-config singleton (used by get_language_instruction).
         set_config(self.config)
 
         # Create necessary directories
@@ -100,8 +109,11 @@ class TradingAgentsGraph:
 
         self.memory_log = TradingMemoryLog(self.config)
 
-        # Create tool nodes
-        self.tool_nodes = self._create_tool_nodes()
+        # Resolve per-analyst LangChain tool lists from the MCP registry.
+        self.tool_lists = {
+            k: self.tool_registry.tools_for(ts) for k, ts in ANALYST_TOOLSETS.items()
+        }
+        self.tool_nodes = {k: ToolNode(tools) for k, tools in self.tool_lists.items()}
 
         # Initialize components
         self.conditional_logic = ConditionalLogic(
@@ -112,6 +124,7 @@ class TradingAgentsGraph:
             self.quick_thinking_llm,
             self.deep_thinking_llm,
             self.tool_nodes,
+            self.tool_lists,
             self.conditional_logic,
         )
 
@@ -151,46 +164,10 @@ class TradingAgentsGraph:
 
         return kwargs
 
-    def _create_tool_nodes(self) -> Dict[str, ToolNode]:
-        """Create tool nodes for different data sources using abstract methods."""
-        return {
-            "market": ToolNode(
-                [
-                    # Core stock data tools
-                    get_stock_data,
-                    # Technical indicators
-                    get_indicators,
-                ]
-            ),
-            "social": ToolNode(
-                [
-                    # News tools for social media analysis
-                    get_news,
-                ]
-            ),
-            "news": ToolNode(
-                [
-                    # News and insider information
-                    get_news,
-                    get_global_news,
-                    get_insider_transactions,
-                ]
-            ),
-            "fundamentals": ToolNode(
-                [
-                    # Fundamental analysis tools
-                    get_fundamentals,
-                    get_balance_sheet,
-                    get_cashflow,
-                    get_income_statement,
-                ]
-            ),
-        }
-
     def _fetch_returns(
         self, ticker: str, trade_date: str, holding_days: int = 5
     ) -> Tuple[Optional[float], Optional[float], Optional[int]]:
-        """Fetch raw and alpha return for ticker over holding_days from trade_date.
+        """Fetch raw and VNINDEX-benchmarked alpha return over ``holding_days``.
 
         Returns (raw_return, alpha_return, actual_holding_days) or
         (None, None, None) if price data is unavailable (too recent, delisted,
@@ -198,26 +175,34 @@ class TradingAgentsGraph:
         """
         try:
             start = datetime.strptime(trade_date, "%Y-%m-%d")
-            end = start + timedelta(days=holding_days + 7)  # buffer for weekends/holidays
-            end_str = end.strftime("%Y-%m-%d")
+            today = datetime.now()
+            lookback_days = max((today - start).days + holding_days + 7, holding_days + 14)
 
-            stock = yf.Ticker(ticker).history(start=trade_date, end=end_str)
-            spy = yf.Ticker("SPY").history(start=trade_date, end=end_str)
-
-            if len(stock) < 2 or len(spy) < 2:
+            stock_rows = get_trading_history(ticker.upper(), lookback_days)
+            index_rows = get_vnindex_history(lookback_days)
+            if not stock_rows or not index_rows:
                 return None, None, None
 
-            actual_days = min(holding_days, len(stock) - 1, len(spy) - 1)
-            raw = float(
-                (stock["Close"].iloc[actual_days] - stock["Close"].iloc[0])
-                / stock["Close"].iloc[0]
-            )
-            spy_ret = float(
-                (spy["Close"].iloc[actual_days] - spy["Close"].iloc[0])
-                / spy["Close"].iloc[0]
-            )
-            alpha = raw - spy_ret
-            return raw, alpha, actual_days
+            start_date = start.date()
+
+            def _from_trade_date(rows: list[dict]) -> list[dict]:
+                cut = []
+                for r in rows:
+                    t = r.get("time")
+                    rt = t.date() if hasattr(t, "date") else datetime.strptime(str(t)[:10], "%Y-%m-%d").date()
+                    if rt >= start_date:
+                        cut.append(r)
+                return cut
+
+            stock_after = _from_trade_date(stock_rows)
+            index_after = _from_trade_date(index_rows)
+            if len(stock_after) < 2 or len(index_after) < 2:
+                return None, None, None
+
+            actual_days = min(holding_days, len(stock_after) - 1, len(index_after) - 1)
+            raw = (stock_after[actual_days]["close"] - stock_after[0]["close"]) / stock_after[0]["close"]
+            idx_ret = (index_after[actual_days]["close"] - index_after[0]["close"]) / index_after[0]["close"]
+            return float(raw), float(raw - idx_ret), actual_days
         except Exception as e:
             logger.warning(
                 "Could not resolve outcome for %s on %s (will retry next run): %s",

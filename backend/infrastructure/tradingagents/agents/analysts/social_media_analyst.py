@@ -1,20 +1,25 @@
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from infrastructure.tradingagents.agents.utils.agent_utils import build_instrument_context, get_language_instruction, get_news
-from infrastructure.tradingagents.dataflows.config import get_config
+from langchain_core.tools import BaseTool
+
+from infrastructure.tradingagents.agents.utils.agent_utils import (
+    build_instrument_context,
+    get_language_instruction,
+)
 
 
-def create_social_media_analyst(llm):
-    def social_media_analyst_node(state):
+def create_social_media_analyst(llm, tools: list[BaseTool]):
+    async def social_media_analyst_node(state):
         current_date = state["trade_date"]
         instrument_context = build_instrument_context(state["company_of_interest"])
 
-        tools = [
-            get_news,
-        ]
-
         system_message = (
-            "You are a social media and company specific news researcher/analyst tasked with analyzing social media posts, recent company news, and public sentiment for a specific company over the past week. You will be given a company's name your objective is to write a comprehensive long report detailing your analysis, insights, and implications for traders and investors on this company's current state after looking at social media and what people are saying about that company, analyzing sentiment data of what people feel each day about the company, and looking at recent company news. Use the get_news(query, start_date, end_date) tool to search for company-specific news and social media discussions. Try to look at all sources possible from social media to sentiment to news. Provide specific, actionable insights with supporting evidence to help traders make informed decisions."
-            + """ Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."""
+            "You are a sentiment researcher analyzing Vietnamese stock chatter and company-specific news for a given ticker. "
+            "Write a comprehensive report on what people are saying about the company in recent news and discussion. "
+            "Use the available tools: `stock_news(symbol, limit)` for ticker-specific articles and "
+            "`search_news(keyword, limit)` to dig into related themes, company aliases, or sector reactions. "
+            "Look across multiple sources, surface positive/negative sentiment, recurring concerns, and emerging narratives. "
+            "Provide actionable insights with quoted headlines and links."
+            + """ Append a Markdown table at the end summarizing sentiment by topic."""
             + get_language_instruction()
         )
 
@@ -42,7 +47,7 @@ def create_social_media_analyst(llm):
 
         chain = prompt | llm.bind_tools(tools)
 
-        result = chain.invoke(state["messages"])
+        result = await chain.ainvoke(state["messages"])
 
         report = ""
 

@@ -99,7 +99,7 @@ async def catalog() -> CatalogResponse:
 
 
 @router.post("/run", response_model=StartRunResponse)
-async def run(request: StartRunRequest) -> StartRunResponse:
+async def run(request: StartRunRequest, fastapi_request: Request) -> StartRunResponse:
     ticker = request.ticker.strip().upper()
     if not ticker:
         raise HTTPException(status_code=400, detail="ticker is empty")
@@ -132,7 +132,8 @@ async def run(request: StartRunRequest) -> StartRunResponse:
         "checkpoint_enabled": request.checkpoint_enabled,
     }
 
-    run_obj = start_run(config, selected)
+    tool_registry = fastapi_request.app.state.tool_registry
+    run_obj = start_run(config, selected, tool_registry)
     return StartRunResponse(run_id=run_obj.run_id)
 
 

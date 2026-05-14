@@ -345,7 +345,7 @@ export default function AgentPage() {
 
           <div className="flex flex-col gap-10">
             <SymbolStep
-              defaultValue="SPY"
+              defaultValue="FPT"
               locked={step !== "symbol"}
               value={symbol ?? undefined}
               onSubmit={(v) => {

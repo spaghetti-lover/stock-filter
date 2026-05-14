@@ -1,26 +1,26 @@
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.tools import BaseTool
+
 from infrastructure.tradingagents.agents.utils.agent_utils import (
     build_instrument_context,
-    get_global_news,
     get_language_instruction,
-    get_news,
 )
-from infrastructure.tradingagents.dataflows.config import get_config
 
 
-def create_news_analyst(llm):
-    def news_analyst_node(state):
+def create_news_analyst(llm, tools: list[BaseTool]):
+    async def news_analyst_node(state):
         current_date = state["trade_date"]
         instrument_context = build_instrument_context(state["company_of_interest"])
 
-        tools = [
-            get_news,
-            get_global_news,
-        ]
-
         system_message = (
-            "You are a news researcher tasked with analyzing recent news and trends over the past week. Please write a comprehensive report of the current state of the world that is relevant for trading and macroeconomics. Use the available tools: get_news(query, start_date, end_date) for company-specific or targeted news searches, and get_global_news(curr_date, look_back_days, limit) for broader macroeconomic news. Provide specific, actionable insights with supporting evidence to help traders make informed decisions."
-            + """ Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."""
+            "You are a news researcher analyzing recent Vietnamese market and macro news. "
+            "Write a comprehensive report on current developments that matter for trading the target ticker. "
+            "Use the available tools: `stock_news(symbol, limit)` for ticker-specific articles, "
+            "`market_news(limit)` for broad market headlines, "
+            "`search_news(keyword, limit)` for sector or topic searches (e.g. 'ngân hàng', 'bất động sản'), "
+            "and `trending_topics(top_n)` to see what's dominating headlines right now. "
+            "Synthesize sentiment, catalysts, regulatory news, and macro signals. Provide actionable insights with citations."
+            + """ Append a Markdown table at the end summarizing the key headlines and their implications."""
             + get_language_instruction()
         )
 
@@ -47,7 +47,7 @@ def create_news_analyst(llm):
         prompt = prompt.partial(instrument_context=instrument_context)
 
         chain = prompt | llm.bind_tools(tools)
-        result = chain.invoke(state["messages"])
+        result = await chain.ainvoke(state["messages"])
 
         report = ""
 

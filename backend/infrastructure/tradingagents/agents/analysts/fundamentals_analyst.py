@@ -1,33 +1,27 @@
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.tools import BaseTool
+
 from infrastructure.tradingagents.agents.utils.agent_utils import (
     build_instrument_context,
-    get_balance_sheet,
-    get_cashflow,
-    get_fundamentals,
-    get_income_statement,
-    get_insider_transactions,
     get_language_instruction,
 )
-from infrastructure.tradingagents.dataflows.config import get_config
 
 
-def create_fundamentals_analyst(llm):
-    def fundamentals_analyst_node(state):
+def create_fundamentals_analyst(llm, tools: list[BaseTool]):
+    async def fundamentals_analyst_node(state):
         current_date = state["trade_date"]
         instrument_context = build_instrument_context(state["company_of_interest"])
 
-        tools = [
-            get_fundamentals,
-            get_balance_sheet,
-            get_cashflow,
-            get_income_statement,
-        ]
-
         system_message = (
-            "You are a researcher tasked with analyzing fundamental information over the past week about a company. Please write a comprehensive report of the company's fundamental information such as financial documents, company profile, basic company financials, and company financial history to gain a full view of the company's fundamental information to inform traders. Make sure to include as much detail as possible. Provide specific, actionable insights with supporting evidence to help traders make informed decisions."
-            + " Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."
-            + " Use the available tools: `get_fundamentals` for comprehensive company analysis, `get_balance_sheet`, `get_cashflow`, and `get_income_statement` for specific financial statements."
-            + get_language_instruction(),
+            "You are a researcher analyzing fundamentals for a Vietnamese listed company. "
+            "Write a comprehensive report covering financial ratios, balance sheet, cash flow, and income statement. "
+            "Use the available tools: `get_fundamentals` for ratios + company profile, "
+            "`get_balance_sheet`, `get_cashflow`, `get_income_statement` for individual statements. "
+            "Default `period` is 'year' for ratios and 'quarter' for statements; you may override when relevant. "
+            "Include specific numbers, year-over-year changes, and red flags. "
+            "Provide actionable, evidence-grounded insights for traders."
+            + " Append a Markdown table at the end of the report summarizing the key metrics."
+            + get_language_instruction()
         )
 
         prompt = ChatPromptTemplate.from_messages(
@@ -54,7 +48,7 @@ def create_fundamentals_analyst(llm):
 
         chain = prompt | llm.bind_tools(tools)
 
-        result = chain.invoke(state["messages"])
+        result = await chain.ainvoke(state["messages"])
 
         report = ""
 

@@ -11,7 +11,7 @@ interface Props {
 }
 
 export function SymbolStep({
-  defaultValue = "SPY",
+  defaultValue = "FPT",
   locked = false,
   value,
   onSubmit,
@@ -37,7 +37,7 @@ export function SymbolStep({
             Enter the exact ticker symbol to analyze, including exchange suffix
             when needed{" "}
             <span className="text-[var(--color-text-faint)]">
-              (examples: SPY, CNC.TO, 7203.T, 0700.HK)
+              (examples: FPT, DSE, VIC, VCB)
             </span>
           </p>
           <p className="mono text-[11px] text-[var(--color-text-faint)]">

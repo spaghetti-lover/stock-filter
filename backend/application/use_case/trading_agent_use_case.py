@@ -8,7 +8,7 @@ repository-driven.
 
 from __future__ import annotations
 
-import threading
+import asyncio
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -30,6 +30,7 @@ from infrastructure.tradingagents.cli_helpers import (
 from infrastructure.tradingagents.default_config import DEFAULT_CONFIG
 from infrastructure.tradingagents.graph.trading_graph import TradingAgentsGraph
 from infrastructure.tradingagents.stats_handler import StatsCallbackHandler
+from infrastructure.tools import McpToolRegistry
 
 
 SECTION_TITLE = {
@@ -199,8 +200,8 @@ def _process_chunk(buffer: MessageBuffer, chunk: Dict[str, Any]) -> None:
                     buffer.update_agent_status(a, "completed")
 
 
-def _run_pipeline(run: Run) -> None:
-    """Synchronous worker — build the graph and stream chunks into the run queue."""
+async def _run_pipeline_async(run: Run, tool_registry: McpToolRegistry) -> None:
+    """Async worker — build the graph and async-stream chunks into the run queue."""
     cfg = _build_config(run.config)
     handler = StatsCallbackHandler()
     selected = run.selected_analysts
@@ -213,7 +214,13 @@ def _run_pipeline(run: Run) -> None:
     push_event(run, stamp_event({"type": "stats", "stats": handler.get_stats()}))
 
     try:
-        graph = TradingAgentsGraph(selected, config=cfg, debug=True, callbacks=[handler])
+        graph = TradingAgentsGraph(
+            selected,
+            config=cfg,
+            debug=True,
+            callbacks=[handler],
+            tool_registry=tool_registry,
+        )
     except Exception as exc:
         fail_run(run, exc)
         return
@@ -232,7 +239,7 @@ def _run_pipeline(run: Run) -> None:
 
     final_state: Optional[Dict[str, Any]] = None
     try:
-        for chunk in graph.graph.stream(init_state, **args):
+        async for chunk in graph.graph.astream(init_state, **args):
             _process_chunk(buffer, chunk)
             final_state = chunk
     except Exception as exc:
@@ -269,12 +276,19 @@ def _run_pipeline(run: Run) -> None:
     push_event(run, stamp_event({"type": "status", "status": "done"}))
 
 
-def start_run(config: Dict[str, Any], selected_analysts: list[str]) -> Run:
-    """Create a run, start the worker thread, and return the run handle."""
+def start_run(
+    config: Dict[str, Any],
+    selected_analysts: list[str],
+    tool_registry: McpToolRegistry,
+) -> Run:
+    """Create a run and schedule the async pipeline on the running event loop.
+
+    The pipeline MUST share the loop where the FastMCP client sessions were
+    opened (the FastAPI main loop, via lifespan). A separate worker-thread loop
+    would not see those sessions and tool calls would hang.
+    """
     run = create_run(config, selected_analysts)
-    thread = threading.Thread(target=_run_pipeline, args=(run,), daemon=True)
-    run._thread = thread
-    thread.start()
+    run._task = asyncio.create_task(_run_pipeline_async(run, tool_registry))
     cleanup_old()
     return run
 

@@ -5,18 +5,9 @@ from logger import get_logger
 from claude_agent_sdk import query, ClaudeAgentOptions, McpSdkServerConfig, ResultMessage, AssistantMessage, SystemMessage
 
 from domain.agents.agent_provider import AgentProvider
-from infrastructure.agents.mcp_config import McpConfig, ALL_TOOLS
-from infrastructure.mcp.data import mcp as data_mcp
-from infrastructure.mcp.news import mcp as news_mcp
-from infrastructure.mcp.fundamentals import mcp as fundamentals_mcp
+from infrastructure.tools import ToolSet, CHAT_ALL
 
 log = get_logger(__name__)
-
-_MCP_SERVER_MAP = {
-    "data":         lambda: McpSdkServerConfig(type="sdk", name="data",         instance=data_mcp._mcp_server),
-    "news":         lambda: McpSdkServerConfig(type="sdk", name="news",         instance=news_mcp._mcp_server),
-    "fundamentals": lambda: McpSdkServerConfig(type="sdk", name="fundamentals", instance=fundamentals_mcp._mcp_server),
-}
 
 
 def _format_history(messages: list[dict]) -> str:
@@ -28,10 +19,13 @@ def _format_history(messages: list[dict]) -> str:
 
 
 class ClaudeAgent(AgentProvider):
-    def __init__(self, model: str = "claude-sonnet-4-6", mcp_config: McpConfig = ALL_TOOLS):
+    def __init__(self, model: str = "claude-sonnet-4-6", toolset: ToolSet = CHAT_ALL):
         self._model = model
-        self._mcp_servers = {name: _MCP_SERVER_MAP[name]() for name in mcp_config.servers}
-        self._allowed_tools = mcp_config.allowed_tools
+        self._mcp_servers = {
+            name: McpSdkServerConfig(type="sdk", name=name, instance=server._mcp_server)
+            for name, server in toolset.mcp_servers().items()
+        }
+        self._allowed_tools = toolset.mcp_allowed_tool_ids()
 
     async def chat(self, messages: list[dict], system_prompt: str) -> str:
         if len(messages) > 1:
