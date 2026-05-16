@@ -24,6 +24,42 @@ def build_instrument_context(ticker: str) -> str:
     )
 
 
+_SPEAKER_PREFIXES = (
+    "Bull Analyst:",
+    "Bear Analyst:",
+    "Aggressive Analyst:",
+    "Conservative Analyst:",
+    "Neutral Analyst:",
+)
+
+
+def tail_history(history: str, n_turns: int = 3) -> str:
+    """Return only the last `n_turns` speaker blocks of a debate transcript.
+
+    Caps unbounded growth of `history + "\\n" + argument` so re-injected
+    debate context stays small. With current `max_*_rounds=1` this is a
+    no-op (history always <= n_turns blocks); it becomes load-bearing
+    once rounds are bumped.
+    """
+    if not history or n_turns <= 0:
+        return history or ""
+    text = history
+    indices = []
+    for prefix in _SPEAKER_PREFIXES:
+        start = 0
+        while True:
+            idx = text.find(prefix, start)
+            if idx == -1:
+                break
+            indices.append(idx)
+            start = idx + len(prefix)
+    if len(indices) <= n_turns:
+        return text
+    indices.sort()
+    cut = indices[-n_turns]
+    return text[cut:]
+
+
 def create_msg_delete():
     def delete_messages(state):
         """Clear messages and add placeholder for Anthropic compatibility"""

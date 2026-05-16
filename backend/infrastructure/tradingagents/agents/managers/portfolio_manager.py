@@ -14,6 +14,7 @@ from infrastructure.tradingagents.agents.schemas import PortfolioDecision, rende
 from infrastructure.tradingagents.agents.utils.agent_utils import (
     build_instrument_context,
     get_language_instruction,
+    tail_history,
 )
 from infrastructure.tradingagents.agents.utils.structured import (
     bind_structured,
@@ -39,11 +40,9 @@ def create_portfolio_manager(llm):
             else ""
         )
 
-        prompt = f"""As the Portfolio Manager, synthesize the risk analysts' debate and deliver the final trading decision.
+        static_prefix = f"""As the Portfolio Manager, synthesize the risk analysts' debate and deliver the final trading decision.
 
 {instrument_context}
-
----
 
 **Rating Scale** (use exactly one):
 - **Buy**: Strong conviction to enter or add to position
@@ -52,16 +51,19 @@ def create_portfolio_manager(llm):
 - **Underweight**: Reduce exposure, take partial profits
 - **Sell**: Exit position or avoid entry
 
+Be decisive and ground every conclusion in specific evidence from the analysts.{get_language_instruction()}"""
+
+        prompt = f"""{static_prefix}
+
+---
+
 **Context:**
 - Research Manager's investment plan: **{research_plan}**
 - Trader's transaction proposal: **{trader_plan}**
 {lessons_line}
 **Risk Analysts Debate History:**
-{history}
-
----
-
-Be decisive and ground every conclusion in specific evidence from the analysts.{get_language_instruction()}"""
+{tail_history(history, n_turns=3)}
+"""
 
         final_trade_decision = invoke_structured_or_freetext(
             structured_llm,

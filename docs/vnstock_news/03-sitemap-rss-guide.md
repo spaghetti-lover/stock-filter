@@ -186,12 +186,18 @@ Bảng dưới đây liệt kê sitemap và RSS của các báo chính:
 | **CafeBiz**            | cafebiz.vn        | ✅ [sitemap](https://cafebiz.vn/sitemap.xml)                                                   | ✅ [RSS feeds](https://cafebiz.vn/rss/)                       |
 | **VietStock**          | vietstock.vn      | ✅ [news-sitemap](https://vietstock.vn/news-sitemap.xml)                                       | ✅ [RSS](https://vietstock.vn/rss/)                           |
 | **VnEconomy**          | vneconomy.vn      | ✅ [latest-news](https://vneconomy.vn/latest-news.xml)                                         | ✅                                                            |
-| **Báo Đầu Tư**         | baodautu.vn       | ✅ [sitemap](https://baodautu.vn/sitemap.xml)                                                  | ✅                                                            |
+| **Dân Trí**            | dantri.com.vn     | ✅ sitemap.xml                                                                                 | ✅ rss.xml                                                    |
+| **Thanh Niên**         | thanhnien.vn      | ✅ sitemap.xml                                                                                 | ✅ rss.xml                                                    |
+| **Nhân Dân**           | nhandan.vn        | ✅ sitemap.xml                                                                                 | ✅ rss.xml                                                    |
+| **Người Lao Động**     | nld.com.vn        | ✅ sitemap.xml                                                                                 | ✅ rss.xml                                                    |
+| **Tiền Phong**         | tienphong.vn      | ✅ sitemap.xml                                                                                 | ✅ rss.xml                                                    |
+| **Báo 24h**            | 24h.com.vn        | ✅ sitemap.xml                                                                                 | ✅ rss.xml                                                    |
+| **Znews**              | znews.vn          | ✅ sitemap.xml                                                                                 | ✅ rss.xml                                                    |
 | **PLO**                | plo.vn            | ✅ [monthly](https://plo.vn/sitemaps/news-{year}-{month}.xml)                                  | ✅                                                            |
-| **Báo Mới**            | baomoi.com        | ✅ [sitemap](https://baomoi.com/sitemap.xml)                                                   | ✅                                                            |
-| **Thế Giới Tài Chính** | thesaigontimes.vn | ✅ [incremental](https://thesaigontimes.vn/sitemaps/)                                          | ✅                                                            |
-| **Nhịp Cầu Đầu Tư**    | nhipcaudautu.vn   | ✅ [sitemap](https://nhipcaudautu.vn/sitemap.xml)                                              | ✅                                                            |
-| **Công Thương**        | congthuong.vn     | ✅ [sitemap](https://congthuong.vn/sitemap.xml)                                                | ✅                                                            |
+| **Kinh Tế Sài Gòn**    | thesaigontimes.vn | ✅ [incremental](https://thesaigontimes.vn/sitemaps/)                                          | ✅                                                            |
+| **Diễn Đàn Doanh Nghiệp**| diendandoanhnghiep.vn| ✅ sitemap.xml                                                                              | ✅ rss.xml                                                    |
+| **PetroTimes**         | petrotimes.vn     | ✅ sitemap.xml                                                                                 | ✅ rss.xml                                                    |
+| **Người Quan Sát**     | nguoiquansat.vn   | ✅ sitemap.xml                                                                                 | ✅ rss.xml                                                    |
 
 ---
 
@@ -277,12 +283,10 @@ from vnstock_news import Crawler
 custom_config = {
     "name": "Báo XYZ",
     "domain": "baoxyz.vn",
-    "rss": {
-        "urls": [
-            "https://baoxyz.vn/feed.rss",
-            "https://baoxyz.vn/category/business/feed.rss"
-        ]
-    }
+    "rss_urls": [
+        "https://baoxyz.vn/feed.rss",
+        "https://baoxyz.vn/category/business/feed.rss"
+    ]
 }
 
 crawler = Crawler(custom_config=custom_config)
@@ -301,13 +305,11 @@ custom_config = {
     "domain": "baoxyz.vn",
     "sitemap_url": "https://baoxyz.vn/sitemap.xml",
     "config": {
-        "selectors": {
-            "title": "h1.title",              # CSS selector cho tiêu đề
-            "short_description": "p.summary", # CSS selector cho sapo
-            "content": "div.article-body",    # CSS selector cho nội dung
-            "publish_time": "span.date",      # CSS selector cho ngày
-            "author": "span.author"           # CSS selector cho tác giả
-        }
+        "title_selector": {"tag": "h1", "class": "title"},              # tag và class cho tiêu đề
+        "short_desc_selector": {"tag": "p", "class": "summary"},        # tag và class cho sapo
+        "content_selector": {"tag": "div", "class": "article-body"},    # tag và class cho nội dung
+        "publish_time_selector": {"tag": "span", "class": "date"},      # tag và class cho ngày
+        "author_selector": {"tag": "span", "class": "author"}           # tag và class cho tác giả
     }
 }
 
@@ -339,7 +341,40 @@ articles = crawler.get_articles(limit=100)
 
 ---
 
-## 6. Kiểm Tra Sitemap/RSS Trước Khi Dùng
+## 6. Build Custom Parsers Nâng Cao & Tích Hợp AI Agent
+
+Nếu bạn (và assistant AI của bạn) muốn deep dive để tự xây dựng engine lấy dữ liệu sitemap cực sâu cho bất lỳ báo nào mà không dùng class `Crawler` mặc định, bạn có thể gọi trực tiếp module Resolver bên trong `vnstock_news/config/sitemap_resolver.py`.
+
+### Sử Dụng `DynamicSitemapResolver`
+Thay vì tự cào HTML rồi lọc link, hệ thống đã trang bị sẵn thuật toán nội suy (`interpolation`) và fallback caching cho sitemap động:
+
+```python
+from vnstock_news.config.sitemap_resolver import DynamicSitemapResolver
+
+# 1. Khởi tạo Resolver
+resolver = DynamicSitemapResolver(debug=True)
+
+# 2. Định nghĩa base config mở rộng (Mô phỏng 1 AI Agent đang học Pattern)
+my_custom_site = {
+    "sitemap": {
+        "pattern_type": "monthly",
+        "base_url": "https://baolocal.vn/sitemap_news_",
+        "format": "{year}{month:02d}", # Định dạng linh hoạt AI tự sinh: năm 2026 tháng 5 -> 202605
+        "extension": "xml"
+    }
+}
+
+# 3. Kích hoạt nội suy ra URL
+resolved_url = resolver.get_sitemap_url(site_name="baolocal", base_config=my_custom_site)
+print(f"URL sitemap thực tế được nội suy: {resolved_url}")
+# Kết quả trả về tự động mapping thời gian tương lai/hiện tại: https://baolocal.vn/sitemap_news_202604.xml
+```
+
+Khi sử dụng module logic thay vì text thuần, AI Agents có thể liên tục thử sinh `pattern_type` là `monthly`, hoặc `incremental` và inject vào config cho tới khi cào thành công để tự build parser độc lập.
+
+---
+
+## 7. Kiểm Tra Sitemap/RSS Trước Khi Dùng
 
 ### **Kiểm Tra Sitemap**
 
@@ -382,7 +417,7 @@ curl https://vnexpress.net/rss/tin-moi-nhat.rss | head -50
 
 ---
 
-## 7. Cập Nhật SITES_CONFIG
+## 8. Cập Nhật SITES_CONFIG
 
 Nếu bạn tìm được sitemap/RSS mới, báo cáo lên GitHub:
 
@@ -400,7 +435,7 @@ SITES_CONFIG["my_news"] = {
 
 ---
 
-## 8. Lưu Ý Quan Trọng - Legal & Ethical
+## 9. Lưu Ý Quan Trọng - Legal & Ethical
 
 ⚠️ **NGƯỜI DÙNG TỰ CHỊU TRÁCH NHIỆM** với các vấn đề sau:
 
@@ -478,54 +513,18 @@ HTTP 429 Too Many Requests
 
 ---
 
-## 9. Ví Dụ Thực Tế
+## 10. Ví Dụ Thực Tế & Templates Chạy Ngay
 
-### Lấy Sitemap Của CafeF
+Chúng tôi đã đóng gói các kịch bản mẫu dựa trên hai công cụ đắc lực RSS và Sitemap thành file chạy (Scripts Templates) với cấu trúc Use Case thực tế tại thư mục `scripts/`. Hãy sử dụng chúng để tham khảo thay vì copy các đoạn code nhỏ lẻ.
 
-```python
-from vnstock_news import Crawler
-import pandas as pd
+✅ Kịch bản 1: Bot Tracking Chứng khoán qua **RSS**.
+👉 Tệp mẫu: [`scripts/01_realtime_rss_tracking.py`](scripts/01_realtime_rss_tracking.py)
 
-crawler = Crawler(site_name="cafef")
+✅ Kịch bản 2: Tải Dữ liệu cho AI/NLP qua **Sitemap**.
+👉 Tệp mẫu: [`scripts/02_historical_sitemap_ml.py`](scripts/02_historical_sitemap_ml.py)
 
-# Lấy 100 bài từ sitemap
-articles = crawler.get_articles(limit=100)
-
-print(f"✅ Lấy {len(articles)} bài từ CafeF")
-
-# Nếu muốn convert sang DataFrame
-df = pd.DataFrame(articles)
-print(df[['url', 'lastmod']].head())
-```
-
----
-
-### Lấy RSS + Sitemap Cùng Lúc
-
-```python
-from vnstock_news import Crawler
-import pandas as pd
-
-crawler = Crawler(site_name="tuoitre")
-
-# Lấy RSS (mới nhất)
-rss_articles = crawler.get_articles_from_feed(limit_per_feed=30)
-
-# Lấy Sitemap (lịch sử)
-sitemap_articles = crawler.get_articles(limit=100)
-
-# Convert to DataFrame
-rss_df = pd.DataFrame(rss_articles) if rss_articles else pd.DataFrame()
-sitemap_df = pd.DataFrame(sitemap_articles) if sitemap_articles else pd.DataFrame()
-
-# Gộp, loại bỏ duplicate
-if not rss_df.empty and not sitemap_df.empty:
-    all_articles = pd.concat([rss_df, sitemap_df], ignore_index=True)
-    all_articles = all_articles.drop_duplicates(subset=['url'])
-    print(f"✅ Tổng {len(all_articles)} bài (RSS + Sitemap)")
-else:
-    print("❌ Không có dữ liệu từ RSS hoặc Sitemap")
-```
+✅ Kịch bản 3: Kết hợp gộp (Union) cả RSS và Sitemap khắc phục điểm mù.
+👉 Tệp mẫu: [`scripts/03_combined_rss_sitemap.py`](scripts/03_combined_rss_sitemap.py)
 
 ---
 
