@@ -1,6 +1,24 @@
 from langchain_core.messages import HumanMessage, RemoveMessage
 
 
+def get_trading_style_hint() -> str:
+    """Return a one-line hint nudging the Market Analyst toward the right
+    time horizon. Day Trading → intraday/hour; Swing Trading → daily."""
+    from infrastructure.tradingagents.runtime_config import get_config
+    style = (get_config().get("trading_style") or "swing").lower()
+    if style == "day":
+        return (
+            "Trading style: DAY TRADING. Default time unit is HOUR — pull "
+            "shorter OHLCV windows (e.g. days=20), favor intraday momentum, "
+            "and frame entry/exit on the hourly horizon."
+        )
+    return (
+        "Trading style: SWING TRADING. Default time unit is DAY — pull "
+        "multi-month OHLCV windows (e.g. days=120), favor multi-day "
+        "trend structure, and frame entry/exit on the daily horizon."
+    )
+
+
 def get_language_instruction() -> str:
     """Return a prompt instruction for the configured output language.
 

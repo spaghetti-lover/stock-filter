@@ -1,6 +1,11 @@
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel
+
+
+class AgentModelOverride(BaseModel):
+    model: str
+    effort: str | None = None
 
 
 class StartRunRequest(BaseModel):
@@ -18,6 +23,8 @@ class StartRunRequest(BaseModel):
     anthropic_effort: str | None = None
     checkpoint_enabled: bool = False
     youtube_urls: list[str] | None = None
+    trading_style: Literal["day", "swing"] = "swing"
+    agent_models: dict[str, AgentModelOverride] | None = None
 
 
 class StartRunResponse(BaseModel):
@@ -55,12 +62,26 @@ class ProviderOption(BaseModel):
     backend_url: str | None
 
 
+class AgentEntry(BaseModel):
+    key: str
+    label: str
+    default_tier: Literal["quick", "deep"]
+
+
+class ModelWithEffort(BaseModel):
+    label: str
+    model: str
+    effort: str | None
+
+
 class CatalogResponse(BaseModel):
     analysts: list[str]
     languages: list[str]
     depths: list[DepthOption]
     providers: list[ProviderOption]
     models: dict[str, dict[str, list[CatalogChoice]]]
+    agents: list[AgentEntry]
+    models_with_effort: dict[str, list[ModelWithEffort]]
 
 
 class RunSnapshotResponse(BaseModel):

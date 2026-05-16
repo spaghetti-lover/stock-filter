@@ -7,17 +7,41 @@ export interface CatalogChoice {
   value: string;
 }
 
+export interface AgentEntry {
+  key: string;
+  label: string;
+  default_tier: "quick" | "deep";
+}
+
+export interface ModelWithEffort {
+  label: string;
+  model: string;
+  effort: string | null;
+}
+
+export interface SymbolEntry {
+  exchange: string;
+  symbol: string;
+}
+
 export interface CatalogResponse {
   analysts: string[];
   languages: string[];
   depths: { label: string; hint: string; value: number }[];
   providers: { label: string; key: string; backend_url: string | null }[];
   models: Record<string, { quick: CatalogChoice[]; deep: CatalogChoice[] }>;
+  agents: AgentEntry[];
+  models_with_effort: Record<string, ModelWithEffort[]>;
 }
 
 export interface AnnouncementsResponse {
   announcements: string[];
   require_attention: boolean;
+}
+
+export interface AgentModelOverride {
+  model: string;
+  effort: string | null;
 }
 
 export interface StartRunPayload {
@@ -34,6 +58,8 @@ export interface StartRunPayload {
   anthropic_effort?: string | null;
   backend_url?: string | null;
   youtube_urls?: string[] | null;
+  trading_style: "day" | "swing";
+  agent_models: Record<string, AgentModelOverride>;
 }
 
 export interface StartRunResponse {
@@ -98,6 +124,10 @@ async function getJson<T>(path: string): Promise<T> {
 
 export function fetchCatalog(): Promise<CatalogResponse> {
   return getJson<CatalogResponse>("/trading-agent/catalog");
+}
+
+export function fetchSymbols(): Promise<SymbolEntry[]> {
+  return getJson<SymbolEntry[]>("/symbols");
 }
 
 export function fetchAnnouncements(): Promise<AnnouncementsResponse> {

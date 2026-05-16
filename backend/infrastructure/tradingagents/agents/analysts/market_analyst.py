@@ -4,6 +4,7 @@ from langchain_core.tools import BaseTool
 from infrastructure.tradingagents.agents.utils.agent_utils import (
     build_instrument_context,
     get_language_instruction,
+    get_trading_style_hint,
 )
 
 
@@ -44,6 +45,8 @@ Workflow:
 3. Avoid redundant picks (e.g. don't pick both `rsi` and a duplicate momentum oscillator).
 4. Write a detailed, nuanced report explaining the trends and what they imply for traders. Include specific values, dates, and actionable insights."""
             + """ Append a Markdown table at the end of the report summarizing the key points."""
+            + "\n\n"
+            + get_trading_style_hint()
             + get_language_instruction()
         )
 

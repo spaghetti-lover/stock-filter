@@ -59,6 +59,8 @@ def _build_config(payload: Dict[str, Any]) -> Dict[str, Any]:
     cfg["anthropic_effort"] = payload.get("anthropic_effort")
     cfg["output_language"] = payload.get("output_language", "English")
     cfg["checkpoint_enabled"] = bool(payload.get("checkpoint_enabled", False))
+    cfg["trading_style"] = payload.get("trading_style", "swing")
+    cfg["agent_models"] = payload.get("agent_models") or {}
     return cfg
 
 

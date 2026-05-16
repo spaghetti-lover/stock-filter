@@ -15,15 +15,13 @@ class GraphSetup:
 
     def __init__(
         self,
-        quick_thinking_llm: Any,
-        deep_thinking_llm: Any,
+        agent_llms: Dict[str, Any],
         tool_nodes: Dict[str, ToolNode],
         tool_lists: Dict[str, list],
         conditional_logic: ConditionalLogic,
     ):
-        """Initialize with required components."""
-        self.quick_thinking_llm = quick_thinking_llm
-        self.deep_thinking_llm = deep_thinking_llm
+        """Initialize with per-agent LLMs (keyed by canonical agent name)."""
+        self.agent_llms = agent_llms
         self.tool_nodes = tool_nodes
         self.tool_lists = tool_lists
         self.conditional_logic = conditional_logic
@@ -50,50 +48,50 @@ class GraphSetup:
 
         if "market" in selected_analysts:
             analyst_nodes["market"] = create_market_analyst(
-                self.quick_thinking_llm, self.tool_lists["market"]
+                self.agent_llms["market"], self.tool_lists["market"]
             )
             delete_nodes["market"] = create_msg_delete()
             tool_nodes["market"] = self.tool_nodes["market"]
 
         if "social" in selected_analysts:
             analyst_nodes["social"] = create_social_media_analyst(
-                self.quick_thinking_llm, self.tool_lists["social"]
+                self.agent_llms["social"], self.tool_lists["social"]
             )
             delete_nodes["social"] = create_msg_delete()
             tool_nodes["social"] = self.tool_nodes["social"]
 
         if "news" in selected_analysts:
             analyst_nodes["news"] = create_news_analyst(
-                self.quick_thinking_llm, self.tool_lists["news"]
+                self.agent_llms["news"], self.tool_lists["news"]
             )
             delete_nodes["news"] = create_msg_delete()
             tool_nodes["news"] = self.tool_nodes["news"]
 
         if "fundamentals" in selected_analysts:
             analyst_nodes["fundamentals"] = create_fundamentals_analyst(
-                self.quick_thinking_llm, self.tool_lists["fundamentals"]
+                self.agent_llms["fundamentals"], self.tool_lists["fundamentals"]
             )
             delete_nodes["fundamentals"] = create_msg_delete()
             tool_nodes["fundamentals"] = self.tool_nodes["fundamentals"]
 
         if "youtube" in selected_analysts:
             analyst_nodes["youtube"] = create_youtube_analyst(
-                self.quick_thinking_llm, self.tool_lists["youtube"]
+                self.agent_llms["youtube"], self.tool_lists["youtube"]
             )
             delete_nodes["youtube"] = create_msg_delete()
             tool_nodes["youtube"] = self.tool_nodes["youtube"]
 
         # Create researcher and manager nodes
-        bull_researcher_node = create_bull_researcher(self.quick_thinking_llm)
-        bear_researcher_node = create_bear_researcher(self.quick_thinking_llm)
-        research_manager_node = create_research_manager(self.deep_thinking_llm)
-        trader_node = create_trader(self.quick_thinking_llm)
+        bull_researcher_node = create_bull_researcher(self.agent_llms["bull"])
+        bear_researcher_node = create_bear_researcher(self.agent_llms["bear"])
+        research_manager_node = create_research_manager(self.agent_llms["research_manager"])
+        trader_node = create_trader(self.agent_llms["trader"])
 
         # Create risk analysis nodes
-        aggressive_analyst = create_aggressive_debator(self.quick_thinking_llm)
-        neutral_analyst = create_neutral_debator(self.quick_thinking_llm)
-        conservative_analyst = create_conservative_debator(self.quick_thinking_llm)
-        portfolio_manager_node = create_portfolio_manager(self.deep_thinking_llm)
+        aggressive_analyst = create_aggressive_debator(self.agent_llms["aggressive"])
+        neutral_analyst = create_neutral_debator(self.agent_llms["neutral"])
+        conservative_analyst = create_conservative_debator(self.agent_llms["conservative"])
+        portfolio_manager_node = create_portfolio_manager(self.agent_llms["portfolio_manager"])
 
         # Create workflow
         workflow = StateGraph(AgentState)

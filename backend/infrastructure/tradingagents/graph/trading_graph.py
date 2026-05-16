@@ -50,6 +50,24 @@ ANALYST_TOOLSETS: Dict[str, ToolSet] = {
 }
 
 
+# Canonical agent keys + which thinker tier each falls back to.
+AGENT_DEFAULT_TIER: Dict[str, str] = {
+    "market": "quick",
+    "social": "quick",
+    "news": "quick",
+    "fundamentals": "quick",
+    "youtube": "quick",
+    "bull": "quick",
+    "bear": "quick",
+    "research_manager": "deep",
+    "trader": "quick",
+    "aggressive": "quick",
+    "neutral": "quick",
+    "conservative": "quick",
+    "portfolio_manager": "deep",
+}
+
+
 class TradingAgentsGraph:
     """Main class that orchestrates the trading agents framework."""
 
@@ -87,27 +105,41 @@ class TradingAgentsGraph:
         os.makedirs(self.config["results_dir"], exist_ok=True)
 
         # Initialize LLMs with provider-specific thinking configuration
-        llm_kwargs = self._get_provider_kwargs()
+        base_kwargs = self._get_provider_kwargs()
 
         # Add callbacks to kwargs if provided (passed to LLM constructor)
         if self.callbacks:
-            llm_kwargs["callbacks"] = self.callbacks
+            base_kwargs["callbacks"] = self.callbacks
 
-        deep_client = create_llm_client(
-            provider=self.config["llm_provider"],
-            model=self.config["deep_think_llm"],
-            base_url=self.config.get("backend_url"),
-            **llm_kwargs,
-        )
-        quick_client = create_llm_client(
-            provider=self.config["llm_provider"],
-            model=self.config["quick_think_llm"],
-            base_url=self.config.get("backend_url"),
-            **llm_kwargs,
-        )
+        def _build_llm(model: str, effort: Optional[str] = None):
+            kwargs = dict(base_kwargs)
+            if effort is not None:
+                self._apply_effort(kwargs, effort)
+            client = create_llm_client(
+                provider=self.config["llm_provider"],
+                model=model,
+                base_url=self.config.get("backend_url"),
+                **kwargs,
+            )
+            return client.get_llm()
 
-        self.deep_thinking_llm = deep_client.get_llm()
-        self.quick_thinking_llm = quick_client.get_llm()
+        self.deep_thinking_llm = _build_llm(self.config["deep_think_llm"])
+        self.quick_thinking_llm = _build_llm(self.config["quick_think_llm"])
+
+        # Per-agent LLM: prefer explicit override, else fall back to the
+        # canonical tier (quick/deep) for that agent.
+        agent_models: Dict[str, Dict[str, Any]] = self.config.get("agent_models") or {}
+        self.agent_llms: Dict[str, Any] = {}
+        for agent_key, tier in AGENT_DEFAULT_TIER.items():
+            override = agent_models.get(agent_key)
+            if override and override.get("model"):
+                self.agent_llms[agent_key] = _build_llm(
+                    override["model"], override.get("effort")
+                )
+            else:
+                self.agent_llms[agent_key] = (
+                    self.deep_thinking_llm if tier == "deep" else self.quick_thinking_llm
+                )
 
         self.memory_log = TradingMemoryLog(self.config)
 
@@ -123,8 +155,7 @@ class TradingAgentsGraph:
             max_risk_discuss_rounds=self.config["max_risk_discuss_rounds"],
         )
         self.graph_setup = GraphSetup(
-            self.quick_thinking_llm,
-            self.deep_thinking_llm,
+            self.agent_llms,
             self.tool_nodes,
             self.tool_lists,
             self.conditional_logic,
@@ -145,26 +176,35 @@ class TradingAgentsGraph:
         self._checkpointer_ctx = None
 
     def _get_provider_kwargs(self) -> Dict[str, Any]:
-        """Get provider-specific kwargs for LLM client creation."""
-        kwargs = {}
+        """Get provider-specific kwargs (effort/thinking) for the default LLM tier."""
+        kwargs: Dict[str, Any] = {}
         provider = self.config.get("llm_provider", "").lower()
 
         if provider == "google":
             thinking_level = self.config.get("google_thinking_level")
             if thinking_level:
                 kwargs["thinking_level"] = thinking_level
-
         elif provider == "openai":
             reasoning_effort = self.config.get("openai_reasoning_effort")
             if reasoning_effort:
                 kwargs["reasoning_effort"] = reasoning_effort
-
         elif provider == "anthropic":
             effort = self.config.get("anthropic_effort")
             if effort:
                 kwargs["effort"] = effort
 
         return kwargs
+
+    def _apply_effort(self, kwargs: Dict[str, Any], effort: str) -> None:
+        """Inject the per-agent effort/thinking value under the right kwarg
+        for the active provider. Other providers ignore it."""
+        provider = self.config.get("llm_provider", "").lower()
+        if provider == "google":
+            kwargs["thinking_level"] = effort
+        elif provider == "openai":
+            kwargs["reasoning_effort"] = effort
+        elif provider == "anthropic":
+            kwargs["effort"] = effort
 
     def _fetch_returns(
         self, ticker: str, trade_date: str, holding_days: int = 5

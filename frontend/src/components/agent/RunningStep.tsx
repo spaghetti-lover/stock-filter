@@ -318,7 +318,7 @@ function ProgressPanel({ agents }: { agents: AgentRow[] }) {
           Progress
         </span>
       </div>
-      <div className="max-h-[260px] overflow-y-auto">
+      <div className="max-h-[420px] overflow-y-auto">
         <table className="mono w-full table-fixed text-[12px]">
           <thead className="text-[var(--color-text-faint)]">
             <tr>
@@ -397,7 +397,7 @@ function MessagesPanel({ rows }: { rows: MsgRow[] }) {
           Messages & Tools
         </span>
       </div>
-      <div className="max-h-[260px] overflow-y-auto">
+      <div className="max-h-[420px] overflow-y-auto">
         {rows.length === 0 ? (
           <div className="mono px-3 py-4 text-[12px] text-[var(--color-text-faint)]">
             · awaiting first tool dispatch…
@@ -483,7 +483,7 @@ function CurrentReportPanel({ report, title }: { report: string; title?: string 
         </div>
         <RenderModeToggle mode={mode} onChange={setMode} />
       </div>
-      <div ref={scrollRef} className="max-h-[320px] overflow-y-auto px-4 py-3">
+      <div ref={scrollRef} className="max-h-[560px] overflow-y-auto px-4 py-3">
         {!report ? (
           <p className="mono text-[12px] text-[var(--color-text-faint)]">
             · waiting for first analyst draft…

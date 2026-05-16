@@ -12,10 +12,12 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from application.dto.trading_agent_dto import (
+    AgentEntry,
     AnnouncementsResponse,
     CatalogChoice,
     CatalogResponse,
     DepthOption,
+    ModelWithEffort,
     ProviderOption,
     RunReportResponse,
     RunSnapshotResponse,
@@ -27,7 +29,8 @@ from application.dto.trading_agent_dto import (
 from application.use_case.trading_agent_use_case import save_report_to_disk, start_run
 from infrastructure.tradingagents.runs import attach_loop, detach, get, get_snapshot, stamp_event
 from infrastructure.tradingagents.announcements import fetch_announcements
-from infrastructure.tradingagents.llm_clients.model_catalog import MODEL_OPTIONS
+from infrastructure.tradingagents.llm_clients.model_catalog import MODEL_OPTIONS, expand_models_with_effort
+from infrastructure.tradingagents.graph.trading_graph import AGENT_DEFAULT_TIER
 from infrastructure.tradingagents.models import AnalystType
 
 
@@ -44,6 +47,21 @@ DEPTH_OPTIONS = [
     {"label": "Medium", "hint": "moderate debate rounds", "value": 3},
     {"label": "Deep", "hint": "comprehensive debate", "value": 5},
 ]
+AGENT_LABELS: dict[str, str] = {
+    "market": "Market Analyst",
+    "social": "Social Analyst",
+    "news": "News Analyst",
+    "fundamentals": "Fundamentals Analyst",
+    "youtube": "Youtube Analyst",
+    "bull": "Bull Researcher",
+    "bear": "Bear Researcher",
+    "research_manager": "Research Manager",
+    "trader": "Trader",
+    "aggressive": "Aggressive Analyst",
+    "neutral": "Neutral Analyst",
+    "conservative": "Conservative Analyst",
+    "portfolio_manager": "Portfolio Manager",
+}
 PROVIDERS = [
     {"label": "OpenAI", "key": "openai", "backend_url": "https://api.openai.com/v1"},
     {"label": "Google", "key": "google", "backend_url": None},
@@ -89,12 +107,23 @@ async def catalog() -> CatalogResponse:
             "quick": [CatalogChoice(label=label, value=value) for label, value in modes.get("quick", [])],
             "deep": [CatalogChoice(label=label, value=value) for label, value in modes.get("deep", [])],
         }
+    agents = [
+        AgentEntry(key=key, label=AGENT_LABELS[key], default_tier=tier)
+        for key, tier in AGENT_DEFAULT_TIER.items()
+    ]
+    expanded = expand_models_with_effort([p["key"] for p in PROVIDERS])
+    models_with_effort = {
+        provider: [ModelWithEffort(**entry) for entry in items]
+        for provider, items in expanded.items()
+    }
     return CatalogResponse(
         analysts=ANALYST_ORDER,
         languages=LANGUAGES,
         depths=[DepthOption(**d) for d in DEPTH_OPTIONS],
         providers=[ProviderOption(**p) for p in PROVIDERS],
         models=models,
+        agents=agents,
+        models_with_effort=models_with_effort,
     )
 
 
@@ -131,6 +160,10 @@ async def run(request: StartRunRequest, fastapi_request: Request) -> StartRunRes
         "anthropic_effort": request.anthropic_effort,
         "checkpoint_enabled": request.checkpoint_enabled,
         "youtube_urls": request.youtube_urls or [],
+        "trading_style": request.trading_style,
+        "agent_models": {
+            k: v.model_dump() for k, v in (request.agent_models or {}).items()
+        },
     }
 
     tool_registry = fastapi_request.app.state.tool_registry

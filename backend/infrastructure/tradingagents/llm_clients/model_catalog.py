@@ -132,3 +132,79 @@ def get_known_models() -> Dict[str, List[str]]:
         )
         for provider, mode_options in MODEL_OPTIONS.items()
     }
+
+
+# ── Effort tier expansion ─────────────────────────────────────────────────
+
+EFFORT_TIERS: Dict[str, List[str]] = {
+    "openai": ["low", "medium", "high"],
+    "anthropic": ["low", "medium", "high"],
+    "google": ["minimal", "high"],
+}
+
+# Models that do NOT support effort levels (always emitted with effort=None).
+_NO_EFFORT_MODELS: Dict[str, set[str]] = {
+    "anthropic": {"claude-haiku-4-5"},
+    "openai": {"gpt-4.1"},
+}
+
+_EFFORT_LABEL: Dict[str, str] = {
+    "low": "Low Effort",
+    "medium": "Medium Effort",
+    "high": "High Effort",
+    "minimal": "Minimal Thinking",
+}
+
+
+_DYNAMIC_PROVIDERS = ("openrouter", "azure")
+
+
+def expand_models_with_effort(
+    providers: List[str] | None = None,
+) -> Dict[str, List[Dict[str, object]]]:
+    """Pre-expand model × effort options for the catalog API.
+
+    Returns a per-provider list of `{label, model, effort}` entries.
+    Each model appears once per supported effort tier; models without
+    effort levels appear once with `effort=None`. Providers with no
+    static catalog (openrouter, azure) get an empty list — frontend
+    should fall back to the global shallow/deep selection for them.
+    """
+    keys = providers if providers is not None else list(MODEL_OPTIONS.keys()) + list(_DYNAMIC_PROVIDERS)
+    out: Dict[str, List[Dict[str, object]]] = {}
+    for provider in keys:
+        modes = MODEL_OPTIONS.get(provider, {"quick": [], "deep": []})
+        seen: set[tuple[str, str | None]] = set()
+        entries: List[Dict[str, object]] = []
+        tiers = EFFORT_TIERS.get(provider)
+        no_effort_models = _NO_EFFORT_MODELS.get(provider, set())
+
+        unique_models: List[tuple[str, str]] = []
+        seen_models: set[str] = set()
+        for mode in ("quick", "deep"):
+            for label, value in modes.get(mode, []):
+                if value in seen_models:
+                    continue
+                seen_models.add(value)
+                unique_models.append((label, value))
+
+        for label, model in unique_models:
+            if not tiers or model in no_effort_models:
+                key = (model, None)
+                if key in seen:
+                    continue
+                seen.add(key)
+                entries.append({"label": model, "model": model, "effort": None})
+                continue
+            for tier in tiers:
+                key = (model, tier)
+                if key in seen:
+                    continue
+                seen.add(key)
+                entries.append({
+                    "label": f"{model} ({_EFFORT_LABEL[tier]})",
+                    "model": model,
+                    "effort": tier,
+                })
+        out[provider] = entries
+    return out
