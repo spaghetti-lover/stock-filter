@@ -45,6 +45,8 @@ CHAT_ALL = ToolSet(
         "get_balance_sheet",
         "get_cashflow",
         "get_income_statement",
+        "discussion_by_ticker",
+        "discussion_search",
     )
 )
 
@@ -61,6 +63,6 @@ FUNDAMENTALS_ANALYST = ToolSet(
 
 NEWS_ANALYST = ToolSet(names=("stock_news", "market_news", "search_news", "trending_topics"))
 
-SOCIAL_ANALYST = ToolSet(names=("stock_news", "search_news"))
+SOCIAL_ANALYST = ToolSet(names=("discussion_by_ticker", "discussion_search"))
 
 YOUTUBE_ANALYST = ToolSet(names=("get_youtube_transcript",))

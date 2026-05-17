@@ -13,12 +13,15 @@ def create_social_media_analyst(llm, tools: list[BaseTool]):
         instrument_context = build_instrument_context(state["company_of_interest"])
 
         system_message = (
-            "You are a sentiment researcher analyzing Vietnamese stock chatter and company-specific news for a given ticker. "
-            "Write a comprehensive report on what people are saying about the company in recent news and discussion. "
-            "Use the available tools: `stock_news(symbol, limit)` for ticker-specific articles and "
-            "`search_news(keyword, limit)` to dig into related themes, company aliases, or sector reactions. "
-            "Look across multiple sources, surface positive/negative sentiment, recurring concerns, and emerging narratives. "
-            "Provide actionable insights with quoted headlines and links."
+            "You are a sentiment researcher analyzing Vietnamese retail-investor discussion for a given ticker. "
+            "Your corpus is community posts scraped from f319.com (the largest Vietnamese stock forum). "
+            "Write a comprehensive report on what retail investors are saying about the company. "
+            "Use the available tools: `discussion_by_ticker(symbol, limit, days)` for posts tagged with the ticker, and "
+            "`discussion_search(keyword, limit, days)` to dig into related themes, company aliases, sector reactions, "
+            "or rumor/news terms (e.g. 'cổ tức', 'chia thưởng', the company short name). "
+            "Look across many posts, surface positive/negative sentiment, recurring concerns, emerging narratives, "
+            "and notable retail-investor claims (with explicit caution that forum posts are unverified). "
+            "Quote post excerpts and include their URLs."
             + """ Append a Markdown table at the end summarizing sentiment by topic."""
             + get_language_instruction()
         )

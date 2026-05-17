@@ -8,6 +8,7 @@ four server instances under one dict so adapters and toolsets can resolve them.
 from fastmcp import FastMCP
 
 from infrastructure.mcp.data import mcp as _data_mcp
+from infrastructure.mcp.discussions import mcp as _discussions_mcp
 from infrastructure.mcp.news import mcp as _news_mcp
 from infrastructure.mcp.fundamentals import mcp as _fundamentals_mcp
 from infrastructure.mcp.indicators import mcp as _indicators_mcp
@@ -20,6 +21,7 @@ SERVER_INSTANCES: dict[str, FastMCP] = {
     "fundamentals": _fundamentals_mcp,
     "indicators": _indicators_mcp,
     "youtube": _youtube_mcp,
+    "discussions": _discussions_mcp,
 }
 
 
@@ -45,4 +47,7 @@ CATALOG: dict[str, str] = {
     "get_income_statement": "fundamentals",
     # youtube
     "get_youtube_transcript": "youtube",
+    # discussions
+    "discussion_by_ticker": "discussions",
+    "discussion_search": "discussions",
 }

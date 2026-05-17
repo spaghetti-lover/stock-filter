@@ -1,11 +1,14 @@
 from application.services.crawl_service import CrawlUseCase
+from application.services.discussion_crawl_service import DiscussionCrawlUseCase
 from application.use_case.layer1_use_case import Layer1UseCase
 from application.use_case.layer2_use_case import Layer2UseCase
 from infrastructure.persistence.crawl_repository_impl import CrawlRepositoryImpl
+from infrastructure.persistence.discussion_repository_impl import DiscussionRepositoryImpl
 from infrastructure.persistence.layer1_stock_repository_db import Layer1StockRepositoryDB
 from infrastructure.persistence.layer1_stock_repository_impl import Layer1StockRepositoryImpl
 from infrastructure.persistence.layer2_score_repository_db import Layer2ScoreRepositoryDB
 from infrastructure.persistence.stock_metrics import save_stocks_to_db
+from infrastructure.scrapers.f319 import F319Scraper
 
 
 def get_live_layer1_usecase(save: bool = False) -> Layer1UseCase:
@@ -35,3 +38,15 @@ def get_crawl_usecase() -> CrawlUseCase:
 
 def get_layer2_usecase() -> Layer2UseCase:
     return Layer2UseCase(repo=Layer2ScoreRepositoryDB())
+
+
+_discussion_usecase: DiscussionCrawlUseCase | None = None
+
+
+def get_discussion_crawl_usecase() -> DiscussionCrawlUseCase:
+    global _discussion_usecase
+    if _discussion_usecase is None:
+        repo = DiscussionRepositoryImpl()
+        scrapers = [F319Scraper()]
+        _discussion_usecase = DiscussionCrawlUseCase(repo, scrapers)
+    return _discussion_usecase

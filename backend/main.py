@@ -12,10 +12,14 @@ import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from presentation.api.routes import layer1, layer2, chat, trading_agent, symbols
+from presentation.api.routes import layer1, layer2, chat, trading_agent, symbols, discussions
 from db.connection import init_pool, close_pool
 from infrastructure.scheduler.scheduler import start_scheduler, stop_scheduler
-from infrastructure.container import get_crawl_usecase, get_layer2_usecase
+from infrastructure.container import (
+    get_crawl_usecase,
+    get_discussion_crawl_usecase,
+    get_layer2_usecase,
+)
 from infrastructure.tools import McpToolRegistry
 
 log = get_logger(__name__)
@@ -29,11 +33,12 @@ async def lifespan(app: FastAPI):
     app.state.tool_registry = tool_registry
     crawl_usecase = get_crawl_usecase()
     layer2_usecase = get_layer2_usecase()
+    discussion_usecase = get_discussion_crawl_usecase()
 
     async def layer2_refresh():
         await layer2_usecase.execute(refresh=True)
 
-    start_scheduler(crawl_usecase.execute, layer2_refresh)
+    start_scheduler(crawl_usecase.execute, layer2_refresh, discussion_usecase.execute)
     asyncio.create_task(layer2_refresh())
     log.info("App started: DB pool, MCP tool registry, and scheduler initialized")
     yield
@@ -62,3 +67,4 @@ app.include_router(layer2.router, tags=["Layer 2"])
 app.include_router(chat.router, tags=["Chat"])
 app.include_router(trading_agent.router, tags=["Trading Agent"])
 app.include_router(symbols.router, tags=["Symbols"])
+app.include_router(discussions.router, tags=["Discussions"])

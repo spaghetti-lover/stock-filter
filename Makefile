@@ -1,4 +1,4 @@
-.PHONY: remove_pycache db_start db_stop migrate migrate_prod migrate_rollback db_check frontend backend
+.PHONY: remove_pycache db_start db_stop migrate migrate_prod migrate_rollback db_check discussion_check frontend backend
 
 remove_pycache:
 	find . -type d -name "__pycache__" -exec rm -r {} +
@@ -33,6 +33,13 @@ migrate_rollback:
 
 db_check:
 	psql "postgresql://postgres:password@localhost:5432/stock_data" -c "SELECT count(*) AS total_stocks FROM stock_metrics;" -c "SELECT symbol, exchange, price, gtgd20, crawled_at FROM stock_metrics LIMIT 10;" -c "SELECT * FROM crawl_log ORDER BY id DESC LIMIT 5;"
+
+discussion_check:
+	psql "postgresql://postgres:password@localhost:5432/stock_data" \
+		-c "SELECT source, count(*) AS posts FROM discussion_posts GROUP BY source;" \
+		-c "SELECT source, last_external_id, updated_at FROM scraper_cursor;" \
+		-c "SELECT id, source, started_at, finished_at, status, inserted_count, left(coalesce(error_message,''), 80) AS err FROM discussion_crawl_log ORDER BY id DESC LIMIT 10;" \
+		-c "SELECT source, posted_at, author, ticker_symbols, left(title, 60) AS title, left(body, 100) AS snippet FROM discussion_posts ORDER BY posted_at DESC LIMIT 10;"
 
 frontend:
 	cd frontend && bun dev
