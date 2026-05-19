@@ -65,7 +65,7 @@ export function recomputeScores(breakdown: ScoreBreakdown, w: Weights): Recomput
     nwM.mom_ma * mom.ma.score +
     nwM.mom_rs * mom.rs.score +
     nwM.mom_ad * mom.ad.score +
-    nwM.mom_smart_money * mom.smart_money.score +
+    nwM.mom_smart_money * (mom.smart_money?.score ?? 40) +
     nwM.mom_tech * mom.technical.score;
 
   const brk = breakdown.breakout;
@@ -77,7 +77,7 @@ export function recomputeScores(breakdown: ScoreBreakdown, w: Weights): Recomput
       nwB.brk_vol * brk.volume_ratio.score +
       nwB.brk_dryup * brk.dry_up_ratio.score +
       nwB.brk_base * brk.narrowing_ratio.score +
-      nwB.brk_closing_strength * brk.closing_strength.score;
+      nwB.brk_closing_strength * (brk.closing_strength?.score ?? 50);
   }
 
   const nwT = normalize(w, ["liquidity", "momentum", "breakout"]);

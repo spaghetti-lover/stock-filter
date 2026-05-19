@@ -74,7 +74,7 @@ export interface MomentumBreakdown {
   ma: MetricCell;
   rs: MetricCell;
   ad: MetricCell;
-  smart_money: MetricCell;
+  smart_money?: MetricCell;
   technical: MetricCell;
 }
 
@@ -83,7 +83,7 @@ export interface BreakoutBreakdown {
   volume_ratio: MetricCell;
   dry_up_ratio: MetricCell;
   narrowing_ratio: MetricCell;
-  closing_strength: MetricCell;
+  closing_strength?: MetricCell;
   gate_active?: boolean;
 }
 

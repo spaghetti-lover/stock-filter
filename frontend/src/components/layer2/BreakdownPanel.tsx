@@ -108,7 +108,7 @@ export function BreakdownPanel({ stock, weights }: Props) {
           <Metric label="Volume ratio" value={fmtRatio(brk.volume_ratio.value)} score={brk.volume_ratio.score} />
           <Metric label="Dry-up ratio" value={fmtRatio(brk.dry_up_ratio.value)} score={brk.dry_up_ratio.score} />
           <Metric label="Base quality (narrowing)" value={fmtRatio(brk.narrowing_ratio.value)} score={brk.narrowing_ratio.score} />
-          <Metric label="Closing strength" value={fmtPct(brk.closing_strength.value)} score={brk.closing_strength.score} />
+          {brk.closing_strength && <Metric label="Closing strength" value={fmtPct(brk.closing_strength.value)} score={brk.closing_strength.score} />}
         </Column>
       </div>
     </div>
