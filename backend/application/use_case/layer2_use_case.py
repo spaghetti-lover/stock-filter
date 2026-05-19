@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 from domain.entities.layer2_score import Layer2Score
 from domain.repositories.layer2_score_repository import Layer2ScoreRepository
-from infrastructure.market_data.data import get_trading_history, get_intraday, get_vnindex_history
+from infrastructure.market_data.data import get_trading_history, get_intraday, get_vnindex_history, get_foreign_flow, get_proprietary_flow
 from infrastructure.persistence.stock_metrics import executor, CONCURRENCY, get_expected_fraction_at_time
 from utils.layer2 import cal_buy_score
 from logger import get_logger
@@ -47,14 +47,28 @@ class Layer2UseCase:
             async with sem:
                 try:
                     fetch_days = int(65 * 365 / 252) + 15
-                    history_fut = loop.run_in_executor(executor, get_trading_history, symbol, fetch_days)
+                    history_fut  = loop.run_in_executor(executor, get_trading_history, symbol, fetch_days)
                     intraday_fut = loop.run_in_executor(executor, get_intraday, symbol)
-                    history, intraday = await asyncio.gather(history_fut, intraday_fut)
+                    foreign_fut  = loop.run_in_executor(executor, get_foreign_flow, symbol)
+                    prop_fut     = loop.run_in_executor(executor, get_proprietary_flow, symbol)
+                    history, intraday, foreign_flow, prop_flow = await asyncio.gather(
+                        history_fut, intraday_fut, foreign_fut, prop_fut
+                    )
 
                     if len(history) < 65:
                         log.warning("Skipping %s: only %d sessions (need 65)", symbol, len(history))
                         return None
-                    result = cal_buy_score(history, intraday, vnindex_history, minutes_elapsed)
+
+                    foreign_buy  = [r["buy_val"]  for r in foreign_flow]
+                    foreign_sell = [r["sell_val"] for r in foreign_flow]
+                    prop_buy     = [r["buy_val"]  for r in prop_flow]
+                    prop_sell    = [r["sell_val"] for r in prop_flow]
+
+                    result = cal_buy_score(
+                        history, intraday, vnindex_history, minutes_elapsed,
+                        foreign_buy_vals=foreign_buy, foreign_sell_vals=foreign_sell,
+                        prop_buy_vals=prop_buy, prop_sell_vals=prop_sell,
+                    )
                     return Layer2Score(
                         symbol=symbol,
                         exchange=exchange,

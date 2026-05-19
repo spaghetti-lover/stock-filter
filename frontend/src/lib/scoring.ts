@@ -15,23 +15,24 @@ export const DEFAULT_WEIGHTS: Weights = {
   mom_volatility: 0.30,
   mom_ma: 0.20,
   mom_rs: 0.20,
-  mom_ad: 0.15,
-  mom_tech: 0.15,
+  mom_ad: 0.10,
+  mom_smart_money: 0.15,
+  mom_tech: 0.10,
   brk_price: 0.30,
   brk_vol: 0.25,
   brk_dryup: 0.20,
   brk_base: 0.15,
-  brk_hold: 0.10,
-  composite_1d: 0.50,
-  composite_5d: 0.30,
-  composite_20d: 0.20,
+  brk_closing_strength: 0.10,
+  composite_1d: 0.25,
+  composite_5d: 0.45,
+  composite_20d: 0.30,
   ma_ma20: 0.35,
   ma_ma50: 0.30,
   ma_slope: 0.35,
-  rs_3m: 0.60,
-  rs_1m: 0.40,
-  tech_rsi: 0.50,
-  tech_macd: 0.50,
+  rs_3m: 0.35,
+  rs_1m: 0.65,
+  tech_rsi: 0.60,
+  tech_macd: 0.40,
 };
 
 export function normalize(weights: Weights, keys: string[]): Weights {
@@ -58,24 +59,25 @@ export function recomputeScores(breakdown: ScoreBreakdown, w: Weights): Recomput
     nwL.liq_cv * liq.cv.score;
 
   const mom = breakdown.momentum;
-  const nwM = normalize(w, ["mom_volatility", "mom_ma", "mom_rs", "mom_ad", "mom_tech"]);
+  const nwM = normalize(w, ["mom_volatility", "mom_ma", "mom_rs", "mom_ad", "mom_smart_money", "mom_tech"]);
   const momScore =
     nwM.mom_volatility * mom.composite_return.score +
     nwM.mom_ma * mom.ma.score +
     nwM.mom_rs * mom.rs.score +
     nwM.mom_ad * mom.ad.score +
+    nwM.mom_smart_money * mom.smart_money.score +
     nwM.mom_tech * mom.technical.score;
 
   const brk = breakdown.breakout;
   let brkScore = 0;
   if (brk.gate_active) {
-    const nwB = normalize(w, ["brk_price", "brk_vol", "brk_dryup", "brk_base", "brk_hold"]);
+    const nwB = normalize(w, ["brk_price", "brk_vol", "brk_dryup", "brk_base", "brk_closing_strength"]);
     brkScore =
       nwB.brk_price * brk.breakout_ratio.score +
       nwB.brk_vol * brk.volume_ratio.score +
       nwB.brk_dryup * brk.dry_up_ratio.score +
       nwB.brk_base * brk.narrowing_ratio.score +
-      nwB.brk_hold * brk.holding_ratio.score;
+      nwB.brk_closing_strength * brk.closing_strength.score;
   }
 
   const nwT = normalize(w, ["liquidity", "momentum", "breakout"]);

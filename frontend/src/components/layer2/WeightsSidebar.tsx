@@ -25,6 +25,7 @@ const GROUPS: { title: string; keys: { key: string; label: string }[] }[] = [
       { key: "mom_ma", label: "MA analysis" },
       { key: "mom_rs", label: "Relative strength" },
       { key: "mom_ad", label: "A/D ratio" },
+      { key: "mom_smart_money", label: "Smart Money Flow" },
       { key: "mom_tech", label: "Technical (RSI+MACD)" },
     ],
   },
@@ -35,7 +36,7 @@ const GROUPS: { title: string; keys: { key: string; label: string }[] }[] = [
       { key: "brk_vol", label: "Volume confirm" },
       { key: "brk_dryup", label: "Volume dry-up" },
       { key: "brk_base", label: "Base quality" },
-      { key: "brk_hold", label: "Holding ratio" },
+      { key: "brk_closing_strength", label: "Closing strength" },
     ],
   },
 ];

@@ -117,20 +117,26 @@ _Ý nghĩa: Cổ phiếu này có đủ dòng tiền thật, đủ ổn định,
 
 ### Điểm GTGD20
 
-_Quy mô tiền giao dịch nền - mã này bình thường có đủ tiền quay vòng không?_
-
-GTGD_ngay = close × volume
+\_Trả lời câu hỏi: Với quy mô lệnh của tôi, mã này có đủ thanh khoản để vào/ra mà không bị trượt giá không?\_GTGD_ngay = close × volume
 
 GTGD20 = mean(GTGD_ngay, 20_phiên)
 
-| **GTGD20** | **Điểm** | **Phân loại**                       |
-| ---------- | -------- | ----------------------------------- |
-| ≥ 100 tỷ   | 100      | Thanh khoản cực cao (VCB, HPG, VHM) |
-| 50-100 tỷ  | 80       | Thanh khoản cao                     |
-| 20-50 tỷ   | 60       | Thanh khoản khá                     |
-| 5-20 tỷ    | 40       | Trung bình                          |
-| 1-5 tỷ     | 20       | Thấp                                |
-| < 1 tỷ     | 0        | Rất thấp                            |
+GTGD20 dùng 20 phiên trước đó (T-1 đến T-20), không bao gồm hôm nay → giá trị cố định trong ngày. Chỉ chạy 1 lần khi mở phiên
+
+**safety_ratio = GTGD20 / position_size**
+
+Tham số đầu vào:
+
+- position_size: Số tiền tối đa bạn vào 1 mã (VND). Mặc định: 50,000,000 VND. (đưa tham số này vào phần setting)
+
+| **Safety ratio** | **Điểm** | **Ý nghĩa**                                         |
+| ---------------- | -------- | --------------------------------------------------- |
+| ≥ 200×           | 100      | Lệnh chìm trong dòng tiền thị trường - vào/ra tự do |
+| 100-200×         | 80       | Rất thoải mái, không lo trượt giá                   |
+| 50-100×          | 60       | Tốt, trượt giá không đáng kể                        |
+| 20-50×           | 40       | Chấp nhận được, có thể cần chia lệnh                |
+| 10-20×           | 20       | Rủi ro trượt giá rõ rệt, cẩn thận khi thoát         |
+| < 10×            | 0        | Không nên vào - lệnh quá lớn so với thị trường      |
 
 ### Điểm hoạt động intraday
 
@@ -138,11 +144,15 @@ _Hôm nay có dòng tiền vào không - không chỉ thanh khoản nền mà c�
 
 GTGD_intraday = price_hiện_tại × volume_intraday
 
+Volume_intraday: tổng số cổ phiếu được khớp từ đầu phiên đến thời điểm hiện tại.
+
 time_ratio = minutes_elapsed / 225 # 225 phút thực giao dịch (loại ATO 15ph + ATC 15ph)
 
 GTGD_kỳ_vọng = GTGD20 × time_ratio
 
-intraday_ratio = GTGD_intraday / GTGD_kỳ_vọng
+**intraday_ratio = GTGD_intraday / GTGD_kỳ_vọng**
+
+Cập nhật 5 phút/lần
 
 _225 phút = Sáng (9:15-11:30 = 135ph) + Chiều (13:00-14:45 = 105ph) - loại ATO và ATC_
 
@@ -159,7 +169,9 @@ _225 phút = Sáng (9:15-11:30 = 135ph) + Chiều (13:00-14:45 = 105ph) - loại
 
 _Thanh khoản đều đặn hay chỉ bùng lên vài phiên - phân biệt thanh khoản thật vs bẫy volume?_
 
-CV = std(GTGD_20_phiên) / mean(GTGD_20_phiên) × 100
+**CV = std(GTGD_20_phiên) / mean(GTGD_20_phiên) × 100**
+
+Dùng 20 phiên trước , cập nhật đầu phiên.
 
 | **CV**   | **Điểm** |
 | -------- | -------- |
@@ -180,9 +192,11 @@ _Ý nghĩa: Phân biệt mã thanh khoản tốt nhưng đi ngang với mã đan
 
 \+ 0.20 × Điểm sức mạnh tương đối (RS) ← học từ VCP
 
-\+ 0.15 × Điểm tích lũy/phân phối (A/D) ← học từ CANSLIM
+\+ 0.1 × Điểm tích lũy/phân phối (A/D) ← học từ CANSLIM
 
-\+ 0.15 × Điểm xác nhận kỹ thuật (RSI+MACD)
+\+ 0.15 × Smart Money Flow
+
+\+ 0.1 × Điểm xác nhận kỹ thuật (RSI+MACD)
 
 ### Điểm biến động giá đa khung (trọng số 0.3)
 
@@ -194,9 +208,9 @@ return_5d = (close_hôm_nay - close_5d_trước) / close_5d_trước × 100
 
 return_20d = (close_hôm_nay - close_20d_trước) / close_20d_trước × 100
 
-composite = 0.50 × return_1d + 0.30 × return_5d + 0.20 × return_20d
+**composite = 0.25 × return_1d + 0.45 × return_5d + 0.30 × return_20d**
 
-_(Trọng số 50/30/20: Lướt sóng ưu tiên tín hiệu ngắn nhất, nhưng 5D và 20D xác nhận momentum có nền.)_
+_(Trọng số 25/45/30: 5D (~1 tuần) khớp với holding period swing. 20D xác nhận nền momentum. 1D chỉ là trigger nhỏ.)_
 
 | **Composite return** | **Điểm** |
 | -------------------- | -------- |
@@ -287,7 +301,9 @@ rs_3m = stock_return_3M - vnindex_return_3M
 
 rs_1m = stock_return_1M - vnindex_return_1M
 
-rs_weighted = 0.60 × rs_3m + 0.40 × rs_1m
+rs_weighted = 0.35 × rs_3m + 0.65 × rs_1m
+
+_(Lý do: Swing trade cần mã đang dẫn dắt ngay bây giờ, không phải 3 tháng trước. 1M weight cao hơn bắt được rotation sớm hơn.)_
 
 trong đó
 
@@ -329,18 +345,68 @@ ad_ratio = mean(up_days_vol) / mean(down_days_vol)
 | 0.7-1.0       | 40       | Phân phối nhẹ                   |
 | < 0.7         | 20       | Phân phối rõ (smart money ra)   |
 
-### Điểm xác nhận kỹ thuật (RSI + MACD)
+### Điểm Smart Money Flow
 
-RSI 14 phiên
+**\# --- Net Foreign Flow --- (Khối ngoại)**
 
-| **RSI (14 phiên)** | **Điểm** | **Ghi chú**                                                                         |
-| ------------------ | -------- | ----------------------------------------------------------------------------------- |
-| < 50               | 20       | Lực yếu                                                                             |
-| 50-60              | 50       | Trung tính                                                                          |
-| 60-70              | 80       | Momentum tốt                                                                        |
-| \> 70              | 100      | Momentum mạnh - _với lướt sóng, RSI > 70 là dấu hiệu tốt chứ không phải overbought_ |
+foreign_net_5d = sum(foreign_buy_value - foreign_sell_value, 5_phiên) # VND
 
-MACD - chuẩn hóa theo giá:
+foreign_buy_value: khối ngoại mua bao nhiêu tiền trong ngày
+
+foreign_sell_value: khối ngoại bán bao nhiêu tiền trong ngày
+
+foreign_buy_value - foreign_sell_value: mua ròng của từng ngày
+
+foreign_net_5d : Cộng 5 ngày gần nhất lại → tổng dòng tiền ròng khối ngoại trong 1 tuần
+
+**foreign_net_pct = foreign_net_5d / (GTGD20 × 5) × 100**: Chuẩn hóa theo quy mô giao dịch để tính tỉ lệ tương đối % sẽ chính xác hơn là lấy giá trị tuyệt đối do tỉ lệ mua ròng lớn hay nhỏ không chỉ phụ thuộc vào giá trị tuyệt đối mà còn phụ thuộc vào mã. Ví dụ HPG giao dịch 500 tỷ/ngày → 90 tỷ chỉ chiếm tỷ lệ nhỏ nhưng một mã mid-cap giao dịch 30 tỷ/ngày → 90 tỷ là rất lớn
+
+| Foreign net % (5d) | Điểm | Ý nghĩa                      |
+| ------------------ | ---- | ---------------------------- |
+| \> +5%             | 100  | Khối ngoại mua ròng rất mạnh |
+| +2% đến +5%        | 80   | Mua ròng rõ ràng             |
+| +0.5% đến +2%      | 60   | Mua ròng nhẹ                 |
+| \-0.5% đến +0.5%   | 40   | Trung tính                   |
+| \-2% đến -0.5%     | 20   | Bán ròng nhẹ                 |
+| < -2%              | 0    | Bán ròng mạnh - cảnh báo     |
+
+**\# --- Net Proprietary Flow --- (Tự doanh)**
+
+prop_net_5d = sum(prop_buy_value - prop_sell_value, 5_phiên) # VND
+
+prop_net_pct = prop_net_5d / (GTGD20 × 5) × 100
+
+| Prop net % (5d)  | Điểm | Ý nghĩa                |
+| ---------------- | ---- | ---------------------- |
+| \> +3%           | 100  | Tự doanh tích lũy mạnh |
+| +1% đến +3%      | 80   | Mua ròng rõ            |
+| +0.3% đến +1%    | 60   | Mua ròng nhẹ           |
+| \-0.3% đến +0.3% | 40   | Trung tính             |
+| \-1% đến -0.3%   | 20   | Bán ròng nhẹ           |
+| < -1%            | 0    | Bán ròng mạnh          |
+
+Lưu ý: Ngưỡng proprietary thấp hơn foreign vì tự doanh thường giao dịch khối lượng nhỏ hơn so với quỹ ngoại.
+
+**\# --- Composite Smart Money Score ---**
+
+smart_money_score = 0.60 × score(foreign_net_pct) + 0.40 × score(prop_net_pct)
+
+### Điểm xác nhận kỹ thuật score_technical (RSI + MACD)
+
+#### RSI 14 phiên
+
+| **RSI (14 phiên)** | **Điểm** | **Ghi chú**                                           |
+| ------------------ | -------- | ----------------------------------------------------- |
+| < 40               | 0        | Quá yếu                                               |
+| 40-50              | 20       | Yếu                                                   |
+| 50-60              | 60       | Momentum đang xây                                     |
+| **60-70**          | **100**  | **Sweet spot cho swing - mạnh nhưng còn room tăng**   |
+| 70-80              | 60       | Rủi ro mean-reversion trong 2.5 phiên                 |
+| \> 80              | 20       | Nguy hiểm - khả năng đảo chiều trước khi bạn bán được |
+
+_(Logic: Với T+2.5, điểm tối ưu là momentum đang tăng nhưng chưa quá nóng - RSI 60-70 cho xác suất tiếp tục tốt nhất trong 3-5 phiên tiếp theo.)_
+
+#### MACD - chuẩn hóa theo giá
 
 histogram = macd_line - signal_line
 
@@ -351,6 +417,8 @@ histogram_pct = histogram / close_today × 100
 | < 0%           | 20       |
 | 0-0.05%        | 50       |
 | \> 0.05%       | 100      |
+
+**score_technical = 0.60 × score(RSI) + 0.40 × score(MACD)**
 
 ## Điểm Breakout (0.35)
 
@@ -372,7 +440,7 @@ _Lý do: Các sub-component còn lại (volume dry-up, base quality, holding) đ
 
 \+ 0.15 × Điểm chất lượng nền giá ← học từ VCP
 
-\+ 0.10 × Điểm giữ giá sau breakout
+\+ 0.10 × Điểm sức mạnh đóng cửa (closing_strength)
 
 ### Điểm vượt cản giá
 
@@ -448,22 +516,79 @@ narrowing_ratio = atr_5d / atr_20d
 | 0.9-1.1             | 40       | Biên độ ổn định, không co lại               |
 | \> 1.1              | 20       | Biên độ mở rộng - nền loạn, breakout rủi ro |
 
-### Điểm giữ giá sau breakout
+### Điểm sức mạnh đóng cửa (closing_strength)
 
-&nbsp;_Nhiều mã vượt cản đầu phiên nhưng cuối phiên tụt lại - đặc biệt phổ biến trên sàn VN nơi lực xả kỹ thuật mạnh. Holding ratio phân biệt được breakout thật/giả trong cùng phiên._
+|     |     |
+| --- | --- |
+|     |     |
+|     |     |
+|     |     |
+|     |     |
+|     |     |
 
-\# t_breakout = thời điểm đầu tiên giá > High20
+**closing_strength = (close - low) / (high - low) × 100**
 
-minutes_above_high20 = đếm số phút close > High20 từ t_breakout đến hiện tại
+| Closing strength | Điểm | Ý nghĩa                                             |
+| ---------------- | ---- | --------------------------------------------------- |
+| \> 80%           | 100  | Đóng cửa gần high - buyers kiểm soát đến cuối phiên |
+| 60-80%           | 80   | Khá tốt                                             |
+| 40-60%           | 60   | Trung tính                                          |
+| 20-40%           | 40   | Yếu                                                 |
+| < 20%            | 20   | Đóng cửa gần low - sellers kiểm soát cuối phiên     |
 
-minutes_since_breakout = phút từ t_breakout đến hiện tại
+_(Lý do: Closing strength phản ánh ai kiểm soát cuối phiên - dự báo tốt hơn cho gap mở cửa ngày mai và xu hướng các phiên tiếp theo. Data chỉ cần OHLC (đã có sẵn).)_
 
-holding_ratio = minutes_above_high20 / minutes_since_breakout
+### Hệ số đánh giá rủi ro bị khóa T+2.5 (risk_ratio)
 
-| **Holding ratio** | **Điểm** |
-| ----------------- | -------- |
-| \> 90%            | 100      |
-| 70-90%            | 80       |
-| 50-70%            | 60       |
-| 30-50%            | 40       |
-| < 30%             | 20       |
+\# Rủi ro bị khóa = breakout đã chạy xa + biên độ dao động lớn
+
+**risk_ratio = breakout_ratio × (atr_5d / close × 100)**
+
+ATR đo biên độ dao động trung bình mỗi phiên - mã này mỗi ngày giá nhảy bao nhiêu? Do thị trường VN bị khóa tối thiểu 2.5 phiên, ATR cho biết giá có thể chạy ngược bao xa trước khi bán được. Đây là một technical indicator có sẵn.
+
+True Range (1 phiên) = max trong 3 giá trị sau:
+
+1\. high - low (biên độ trong phiên)
+
+2\. |high - close_hôm_trước| (gap lên)
+
+3\. |low - close_hôm_trước| (gap xuống)
+
+ATR_5d = mean(True Range, 5 phiên gần nhất)
+
+| Thành phần           | Đo cái gì                          | Ví dụ                 |
+| -------------------- | ---------------------------------- | --------------------- |
+| breakout_ratio       | Giá đã chạy xa High20 bao nhiêu    | 1.03 = đã vượt 3%     |
+| atr_5d / close × 100 | Biên độ dao động %/ngày            | 4% = mỗi ngày nhảy 4% |
+| risk_ratio           | Kết hợp: xa + volatile = nguy hiểm | 1.03 × 4 = 4.12       |
+
+**breakout_score_final = breakout_score_raw × risk_coefficient**
+
+| Risk ratio | Hệ số  | Ý nghĩa                                      |
+| ---------- | ------ | -------------------------------------------- |
+| < 3        | × 1.0  | Breakout gần + ổn định → giữ nguyên điểm    |
+| 3–5        | × 0.85 | Rủi ro vừa → giảm nhẹ 15%                   |
+| 5–7        | × 0.70 | Rủi ro cao → giảm 30%                        |
+| > 7        | × 0.50 | Rất nguy hiểm → giảm 50% điểm breakout      |
+
+## Tần suất chạy các tham số
+
+| Metric                       | Tính lại mỗi 5 phút? | Lý do                                     |
+| ---------------------------- | -------------------- | ----------------------------------------- |
+| GTGD20                       | Không                | Data 20 phiên trước, không đổi trong ngày |
+| Safety ratio                 | Không                | GTGD20 không đổi, position_size không đổi |
+| CV                           | Không                | Dùng 20 phiên trước                       |
+| MA20, MA50                   | Không                | Dùng close 20/50 phiên trước              |
+| RS vs VN-Index               | Không                | Dùng close 1M/3M trước                    |
+| A/D Ratio                    | Không                | 20 phiên trước                            |
+| Volume dry-up                | Không                | 4 phiên trước                             |
+| Base quality (ATR)           | Không                | 5/20 phiên trước                          |
+|                              |                      |                                           |
+| Intraday activity            | Có                   | Volume + giá thay đổi liên tục            |
+| Breakout ratio               | Có                   | close hiện tại thay đổi                   |
+| Volume breakout confirmation | Có                   | Volume intraday tăng dần                  |
+| Closing strength             | Có                   | OHLC intraday thay đổi                    |
+| RSI, MACD                    | Có                   | Giá hiện tại ảnh hưởng phiên đang chạy    |
+| Return 1D                    | Có                   | Giá hiện tại thay đổi                     |
+| Risk ratio                   | Có                   | Breakout ratio + ATR intraday             |
+| Smart Money Flow             | Có                   | Nếu data foreign/prop cập nhật realtime   |

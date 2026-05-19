@@ -86,3 +86,31 @@ def get_intraday(symbol: str) -> list[dict]:
         return []
     df["time"] = df["time"].dt.time
     return df[["time", "price", "volume"]].to_dict(orient="records")
+
+
+def get_foreign_flow(symbol: str, days: int = 10) -> list[dict]:
+    """Get foreign buy/sell value per session (last N calendar days → ~5 trading sessions)."""
+    log.debug("Fetching foreign_flow: symbol=%s days=%d", symbol, days)
+    _limiter.acquire()
+    end = datetime.now().strftime("%Y-%m-%d")
+    start = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+    try:
+        df = Market().equity(symbol).foreign_flow(start=start, end=end)
+    except Exception:
+        log.debug("No foreign flow for %s", symbol)
+        return []
+    return df[["trading_date", "buy_val", "sell_val"]].to_dict(orient="records")
+
+
+def get_proprietary_flow(symbol: str, days: int = 10) -> list[dict]:
+    """Get proprietary (tự doanh) buy/sell value per session."""
+    log.debug("Fetching proprietary_flow: symbol=%s days=%d", symbol, days)
+    _limiter.acquire()
+    end = datetime.now().strftime("%Y-%m-%d")
+    start = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+    try:
+        df = Market().equity(symbol).proprietary_flow(start=start, end=end)
+    except Exception:
+        log.debug("No proprietary flow for %s", symbol)
+        return []
+    return df[["trading_date", "buy_val", "sell_val"]].to_dict(orient="records")
