@@ -131,10 +131,11 @@ def cal_buy_score(
     gtgd20_val  = cal_gtgd20(close_arr, vol_arr)
 
     # ── Liquidity ────────────────────────────────────────────────────────
-    gtgd_intraday   = cal_intraday_gtgd(intraday)
-    intraday_ratio_ = cal_intraday_ratio(gtgd_intraday, gtgd20_val, minutes_elapsed)
-    cv_val          = cal_cv_val(cal_gtgd_daily(close_arr, vol_arr)[-21:-1])
-    safety_ratio_   = cal_safety_ratio(gtgd20_val, position_size)
+    gtgd_intraday    = cal_intraday_gtgd(intraday)
+    volume_intraday_ = cal_intraday_volume(intraday)
+    intraday_ratio_  = cal_intraday_ratio(gtgd_intraday, gtgd20_val, minutes_elapsed)
+    cv_val           = cal_cv_val(cal_gtgd_daily(close_arr, vol_arr)[-21:-1])
+    safety_ratio_    = cal_safety_ratio(gtgd20_val, position_size)
 
     s_gtgd20    = safety_ratio_score(safety_ratio_)
     s_intraday  = intraday_score(intraday_ratio_)
@@ -143,7 +144,12 @@ def cal_buy_score(
 
     liq_breakdown = {
         "gtgd20": {"value": gtgd20_val, "safety_ratio": safety_ratio_, "score": s_gtgd20},
-        "intraday_ratio": {"value": intraday_ratio_, "score": s_intraday},
+        "intraday_ratio": {
+            "value": intraday_ratio_,
+            "score": s_intraday,
+            "current_price": close_today,
+            "volume_intraday": volume_intraday_,
+        },
         "cv": {"value": cv_val, "score": s_cv},
     }
 

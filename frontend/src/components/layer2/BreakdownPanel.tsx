@@ -1,7 +1,7 @@
 "use client";
 
 import { normalize, type Weights } from "@/lib/scoring";
-import { fmtBillion, fmtPct, fmtRatio, fmtScore } from "@/lib/format";
+import { fmtBillion, fmtPct, fmtRatio, fmtScore, fmtPrice } from "@/lib/format";
 import { Pill } from "@/components/ui/Pill";
 import { PillarGauge } from "./PillarGauge";
 import type { Layer2Score } from "@/lib/types";
@@ -61,6 +61,7 @@ export function BreakdownPanel({ stock, weights }: Props) {
             label="Intraday ratio"
             value={fmtPct(liq.intraday_ratio.value * 100)}
             score={liq.intraday_ratio.score}
+            detail={detailIntraday(liq.intraday_ratio)}
           />
           <Metric label="CV stability" value={fmtPct(liq.cv.value)} score={liq.cv.score} />
         </Column>
@@ -176,6 +177,15 @@ function num(v: unknown): number {
 }
 function obj(v: unknown): Record<string, unknown> {
   return v && typeof v === "object" ? (v as Record<string, unknown>) : {};
+}
+
+function detailIntraday(d: unknown): string | null {
+  const o = obj(d);
+  const price = num(o.current_price);
+  const vol   = num(o.volume_intraday);
+  if (!price && !vol) return null;
+  const volStr = vol.toLocaleString("en-US", { maximumFractionDigits: 0 });
+  return `Price ${fmtPrice(price)} · Vol ${volStr}`;
 }
 
 function detailMomReturn(d: unknown): string {

@@ -8,16 +8,28 @@ log = get_logger(__name__)
 _scheduler: AsyncIOScheduler | None = None
 
 
-def start_scheduler(crawl_fn, layer2_refresh_fn, discussion_crawl_fn):
+def start_scheduler(crawl_fn, layer1_run_fn, layer2_refresh_fn, discussion_crawl_fn):
     global _scheduler
     _scheduler = AsyncIOScheduler()
 
     crawl_trigger = CronTrigger(hour=16, minute=0, timezone="Asia/Ho_Chi_Minh")
     _scheduler.add_job(crawl_fn, crawl_trigger, id="daily_crawl", replace_existing=True)
 
-    layer2_trigger = CronTrigger(minute="*/5", timezone="Asia/Ho_Chi_Minh")
+    layer1_trigger = CronTrigger(hour=9, minute=0, timezone="Asia/Ho_Chi_Minh")
     _scheduler.add_job(
         _safe_run,
+        layer1_trigger,
+        id="layer1_run",
+        replace_existing=True,
+        kwargs={"fn": layer1_run_fn, "label": "Layer 1 run"},
+    )
+
+    # Layer 2 runs every 5 min from 09:15 to 15:00
+    layer2_trigger = CronTrigger(
+        hour="9-14", minute="*/5", timezone="Asia/Ho_Chi_Minh"
+    )
+    _scheduler.add_job(
+        _safe_run_if_trading,
         layer2_trigger,
         id="layer2_refresh",
         replace_existing=True,
@@ -39,7 +51,8 @@ def start_scheduler(crawl_fn, layer2_refresh_fn, discussion_crawl_fn):
 
     _scheduler.start()
     log.info(
-        "Scheduler started: daily crawl at 16:00, layer2 refresh every 5 min, "
+        "Scheduler started: daily crawl at 16:00, layer1 at 09:00, "
+        "layer2 refresh 09:15–15:00 every 5 min, "
         "discussion crawl every 30 min (Asia/Ho_Chi_Minh)"
     )
 
@@ -51,6 +64,19 @@ async def _safe_run(fn, label: str):
         log.warning("%s skipped: %s", label, e)
     except Exception:
         log.error("%s failed", label, exc_info=True)
+
+
+async def _safe_run_if_trading(fn, label: str):
+    from datetime import datetime
+    import pytz
+    now = datetime.now(pytz.timezone("Asia/Ho_Chi_Minh"))
+    # Run only 09:15–15:00
+    start = now.replace(hour=9, minute=15, second=0, microsecond=0)
+    end   = now.replace(hour=15, minute=0, second=0, microsecond=0)
+    if not (start <= now <= end):
+        log.debug("%s skipped: outside trading window %s", label, now.strftime("%H:%M"))
+        return
+    await _safe_run(fn, label)
 
 
 def stop_scheduler():
