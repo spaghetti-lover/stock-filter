@@ -29,7 +29,7 @@ export function TopNav() {
             <span className="mono text-[11px] tracking-[0.22em] text-[var(--color-text-dim)]">
               VN/STOCK
             </span>
-            <span className="display text-[15px] tracking-tight">Stock Agent</span>
+            <span className="display text-[15px] tracking-tight">AgentTrader</span>
           </div>
         </Link>
         {/* Routes */}
