@@ -41,6 +41,7 @@ class ClaudeAgent(AgentProvider):
                 system_prompt=system_prompt,
                 mcp_servers=self._mcp_servers, # pyright: ignore[reportArgumentType]
                 allowed_tools=self._allowed_tools,
+                env={"ANTHROPIC_API_KEY": ""},
             ),
         ):
             if isinstance(message, ResultMessage):
