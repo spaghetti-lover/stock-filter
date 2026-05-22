@@ -2,6 +2,7 @@
 
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { ChartBlock } from "./ChartBlock";
 
 export function Markdown({ children }: { children: string }) {
   return (
@@ -35,13 +36,23 @@ export function Markdown({ children }: { children: string }) {
                 </code>
               );
             }
+            if (/language-chart\b/.test(className ?? "")) {
+              return <ChartBlock raw={String(children).trim()} />;
+            }
             return (
               <code className={`md-code-block ${className ?? ""}`} {...props}>
                 {children}
               </code>
             );
           },
-          pre: ({ children }) => <pre className="md-pre">{children}</pre>,
+          pre: ({ children }) => {
+            const childArr = Array.isArray(children) ? children : [children];
+            const first = childArr[0] as { props?: { className?: string } } | undefined;
+            if (first?.props?.className && /language-chart\b/.test(first.props.className)) {
+              return <>{children}</>;
+            }
+            return <pre className="md-pre">{children}</pre>;
+          },
           table: ({ children }) => (
             <div className="md-table-wrap">
               <table className="md-table">{children}</table>

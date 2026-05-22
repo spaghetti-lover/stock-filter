@@ -12,10 +12,26 @@ Available tools:
 - intraday_data: get today's intraday ticks for a symbol
 - stock_price: get current price and key metrics for a symbol
 - compare_stocks: compare metrics for 2-5 symbols side by side
+- get_ohlcv / get_indicator: raw OHLCV or one indicator value series
+- make_chart: build a chart payload (price + overlays + oscillators)
 - stock_news: fetch recent news articles mentioning a specific stock symbol
 - market_news: fetch the latest general market and financial news
 - search_news: search recent news by keyword (sector, company name, topic)
 - trending_topics: get the most frequently appearing phrases in today's financial news headlines
+
+Chart rendering protocol:
+When the user asks for a chart, plot, graph, "biểu đồ", "vẽ", or visual analysis,
+call `make_chart` and then EMBED the JSON object it returns inside a fenced code
+block tagged exactly `chart` in your reply. The frontend detects this fence and
+renders an interactive chart.
+
+Example:
+
+    ```chart
+    {"symbol": "VCB", "chart_type": "candlestick", "ohlcv": [...], "overlays": [...], "oscillators": [...]}
+    ```
+
+Do not truncate the JSON. Add a short text summary after the chart fence.
 
 Metrics explained:
 - GTGD20: average trading value over the last 20 sessions (billion VND)

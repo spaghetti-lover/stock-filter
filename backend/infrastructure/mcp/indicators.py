@@ -2,6 +2,12 @@ import asyncio
 
 from fastmcp import FastMCP
 
+from infrastructure.market_data.charts import (
+    SUPPORTED_CHART_TYPES,
+    SUPPORTED_OSCILLATORS,
+    SUPPORTED_OVERLAYS,
+    build_chart,
+)
 from infrastructure.market_data.data import get_trading_history
 from infrastructure.market_data.indicators import compute_indicator
 
@@ -52,6 +58,52 @@ async def get_indicator(symbol: str, indicator: str, days: int = 120) -> dict:
         return await asyncio.to_thread(compute_indicator, symbol, name, days)
     except (ValueError, ConnectionError, ConnectionResetError, AttributeError) as e:
         return {"error": str(e)}
+
+
+@mcp.tool
+async def make_chart(
+    symbol: str,
+    chart_type: str = "candlestick",
+    indicators: list[str] | None = None,
+    days: int = 120,
+) -> dict:
+    """Build a chart payload (OHLCV + indicators) for rendering in the chat UI.
+
+    Use this whenever the user asks for a chart, plot, graph, "biểu đồ", "vẽ" or
+    visual analysis. After calling, embed the returned JSON in your reply inside
+    a fenced code block tagged `chart`, like:
+
+        ```chart
+        {"symbol": "VCB", ...}
+        ```
+
+    The frontend detects this fence and renders an interactive chart.
+
+    Args:
+        symbol: Stock symbol, e.g. VCB.
+        chart_type: One of candlestick, line, area. Default candlestick.
+        indicators: List of indicator specs. Overlays on the price pane:
+            sma:LENGTH (e.g. sma:20), ema:LENGTH, vwma:LENGTH, bbands:LENGTH:STD.
+            Oscillators (rendered in their own pane below price):
+            rsi:LENGTH, macd:FAST:SLOW:SIGNAL (params optional).
+            Example: ["sma:20", "sma:50", "bbands:20:2", "rsi:14", "macd"].
+        days: Calendar days of history (default 120; use >= 280 for SMA200).
+    """
+    if chart_type.lower() not in SUPPORTED_CHART_TYPES:
+        return {
+            "error": f"unsupported chart_type: {chart_type}",
+            "supported_chart_types": list(SUPPORTED_CHART_TYPES),
+        }
+    try:
+        return await asyncio.to_thread(
+            build_chart, symbol, chart_type, indicators or [], days
+        )
+    except (ValueError, ConnectionError, ConnectionResetError, AttributeError, KeyError) as e:
+        return {
+            "error": str(e),
+            "supported_overlays": list(SUPPORTED_OVERLAYS),
+            "supported_oscillators": list(SUPPORTED_OSCILLATORS),
+        }
 
 
 if __name__ == "__main__":
