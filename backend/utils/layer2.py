@@ -611,7 +611,7 @@ def cal_rs(stock_return, vnindex_return):
     return stock_return - vnindex_return
 
 def cal_rs_weighted(rs_3m, rs_1m):
-    return 0.60 * rs_3m + 0.40 * rs_1m
+    return 0.35 * rs_3m + 0.65 * rs_1m
 
 def rs_base_score(rs_weighted: float) -> float:
     if rs_weighted > 15:   return 100
