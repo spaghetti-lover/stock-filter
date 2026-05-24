@@ -196,8 +196,10 @@ def cal_buy_score(
     # Smart Money Flow
     if (foreign_buy_vals and foreign_sell_vals and len(foreign_buy_vals) >= 5
             and prop_buy_vals and prop_sell_vals and len(prop_buy_vals) >= 5):
-        f_pct = cal_foreign_net_pct(foreign_buy_vals, foreign_sell_vals, gtgd20_val)
-        p_pct = cal_prop_net_pct(prop_buy_vals, prop_sell_vals, gtgd20_val)
+        gtgd_daily = cal_gtgd_daily(close_arr, vol_arr)
+        gtgd_5d = sum(gtgd_daily[-6:-1])  # last 5 sessions excluding today
+        f_pct = cal_foreign_net_pct(foreign_buy_vals, foreign_sell_vals, gtgd_5d)
+        p_pct = cal_prop_net_pct(prop_buy_vals, prop_sell_vals, gtgd_5d)
         s_smart_money = cal_smart_money_score(foreign_net_score(f_pct), prop_net_score(p_pct))
     else:
         f_pct = p_pct = None
@@ -457,14 +459,29 @@ def momentum_score(price_volatility_score, ma_score, rs_score, ad_score, smart_m
     return (w[0] * price_volatility_score + w[1] * ma_score + w[2] * rs_score
             + w[3] * ad_score + w[4] * smart_money_score + w[5] * technical_confirmation_score)
 
-# Diem bien dong gia composite (RevC: per-timeframe scoring + consistency multiplier)
-# Spec: docs/filter.md §3.2.1
+# Diem bien dong gia composite
+"""
+_Mã có đang chạy mạnh hơn bình thường không - xét đa khung thời gian để lọc noise?_
+return_1d = (close_hôm_nay - close_1d_trước) / close_1d_trước × 100
+return_5d = (close_hôm_nay - close_5d_trước) / close_5d_trước × 100
+return_20d = (close_hôm_nay - close_20d_trước) / close_20d_trước × 100
+composite = 0.50 × return_1d + 0.30 × return_5d + 0.20 × return_20d
+_(Trọng số 50/30/20: Lướt sóng ưu tiên tín hiệu ngắn nhất, nhưng 5D và 20D xác nhận momentum có nền.)_
+
+| **Composite return** | **Điểm** |
+| -------------------- | -------- |
+| < 0%                 | 0        |
+| 0-1%                 | 20       |
+| 1-2%                 | 40       |
+| 2-4%                 | 60       |
+| 4-7%                 | 80       |
+| > 7%                | 100      |
+"""
 def cal_return_n_days(close_today, close_n_days_ago):
     return (close_today - close_n_days_ago) / close_n_days_ago * 100
 
 def cal_composite_return(return_1d, return_5d, return_20d):
-    # Display-only weighted return (kept for breakdown.value rendering)
-    return 0.15 * return_1d + 0.50 * return_5d + 0.35 * return_20d
+    return 0.50 * return_1d + 0.30 * return_5d + 0.20 * return_20d
 
 def score_return_1d(r: float) -> float:
     if r < -1:   return 0
@@ -593,9 +610,8 @@ def vnindex_return_n_days(vnindex_close_today, vnindex_close_n_days_ago):
 def cal_rs(stock_return, vnindex_return):
     return stock_return - vnindex_return
 
-def cal_rs_weighted(rs_3m: float, rs_1m: float) -> float:
-    # RevC: 1M weighted heavier — need leader emerging now
-    return 0.35 * rs_3m + 0.65 * rs_1m
+def cal_rs_weighted(rs_3m, rs_1m):
+    return 0.60 * rs_3m + 0.40 * rs_1m
 
 def rs_base_score(rs_weighted: float) -> float:
     if rs_weighted > 15:   return 100
@@ -642,7 +658,7 @@ def cal_ad_ratio(close, volume):
     up_vol = cal_up_days_vol(close, volume)
     down_vol = cal_down_days_vol(close, volume)
     if len(down_vol) == 0:
-        return float('inf')
+        return 999.0  # all sessions up → score 100
     if len(up_vol) == 0:
         return 0.0
     return sum(up_vol) / len(up_vol) / (sum(down_vol) / len(down_vol))
@@ -999,8 +1015,8 @@ def risk_coefficient(risk_ratio: float) -> float:
 
 # Smart Money Flow
 """
-foreign_net_pct = foreign_net_5d / (GTGD20 × 5) × 100
-prop_net_pct    = prop_net_5d / (GTGD20 × 5) × 100
+foreign_net_pct = foreign_net_5d / sum(GTGD_daily[-6:-1]) × 100
+prop_net_pct    = prop_net_5d / sum(GTGD_daily[-6:-1]) × 100
 smart_money_composite = 0.60 × score(foreign) + 0.40 × score(prop)
 
 | Foreign net % (5d) | Điểm |   | Prop net % (5d)   | Điểm |
@@ -1012,18 +1028,19 @@ smart_money_composite = 0.60 × score(foreign) + 0.40 × score(prop)
 | -2% đến -0.5%       | 20   |   | -1% đến -0.3%     | 20   |
 | < -2%               | 0    |   | < -1%             | 0    |
 """
-def cal_foreign_net_pct(foreign_buy_vals: list[float], foreign_sell_vals: list[float], gtgd20: float) -> float:
+def cal_foreign_net_pct(foreign_buy_vals: list[float], foreign_sell_vals: list[float], gtgd_5d: float) -> float:
     # Data is newest-first (index 0 = most recent session) → take first 5
-    if gtgd20 == 0:
+    # gtgd_5d = sum of actual daily GTGD for the last 5 sessions
+    if gtgd_5d == 0:
         return 0.0
     net_5d = sum(b - s for b, s in zip(foreign_buy_vals[:5], foreign_sell_vals[:5]))
-    return net_5d / (gtgd20 * 5) * 100
+    return net_5d / gtgd_5d * 100
 
-def cal_prop_net_pct(prop_buy_vals: list[float], prop_sell_vals: list[float], gtgd20: float) -> float:
-    if gtgd20 == 0:
+def cal_prop_net_pct(prop_buy_vals: list[float], prop_sell_vals: list[float], gtgd_5d: float) -> float:
+    if gtgd_5d == 0:
         return 0.0
     net_5d = sum(b - s for b, s in zip(prop_buy_vals[:5], prop_sell_vals[:5]))
-    return net_5d / (gtgd20 * 5) * 100
+    return net_5d / gtgd_5d * 100
 
 def foreign_net_score(pct: float) -> int:
     if pct > 5:    return 100
