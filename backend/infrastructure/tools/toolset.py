@@ -37,6 +37,7 @@ CHAT_ALL = ToolSet(
         "compare_stocks",
         "get_ohlcv",
         "get_indicator",
+        "make_chart",
         "stock_news",
         "market_news",
         "search_news",
@@ -50,7 +51,7 @@ CHAT_ALL = ToolSet(
     )
 )
 
-MARKET_ANALYST = ToolSet(names=("get_ohlcv", "get_indicator"))
+MARKET_ANALYST = ToolSet(names=("get_ohlcv", "get_indicator", "make_chart"))
 
 FUNDAMENTALS_ANALYST = ToolSet(
     names=(

@@ -35,6 +35,7 @@ CATALOG: dict[str, str] = {
     # indicators
     "get_ohlcv": "indicators",
     "get_indicator": "indicators",
+    "make_chart": "indicators",
     # news
     "stock_news": "news",
     "market_news": "news",

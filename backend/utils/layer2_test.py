@@ -22,9 +22,12 @@ from utils.layer2 import (
     gtdg20_score, intraday_score, cv_score, liquidity_score,
     # Momentum
     cal_return_n_days, cal_composite_return, price_volatility_score,
+    score_return_1d, score_return_5d, score_return_20d, consistency_multiplier,
     cal_slope_pct, cal_price_vs_ma, cal_ma, cal_ma_n_days_ago,
-    score_price_vs_ma, score_slope_pct, ma_score,
-    stock_return_n_days, vnindex_return_n_days, cal_rs, cal_rs_weighted, rs_score,
+    score_price_vs_ma20, score_price_vs_ma50, score_alignment,
+    score_slope_ma20, score_slope_ma50, ma_score,
+    stock_return_n_days, vnindex_return_n_days, cal_rs, cal_rs_weighted,
+    rs_base_score, rs_acceleration_mult, rs_score,
     cal_ad_ratio, ad_score,
     cal_rsi, cal_macd_histogram, score_rsi, score_macd_histogram,
     technical_confirmation_score, momentum_score,
@@ -251,85 +254,216 @@ class TestCalIntradayRatio:
 # MOMENTUM
 # ===========================================================================
 
+class TestScoreReturn1d:
+    def test_buckets(self):
+        assert score_return_1d(-1.5) == 0
+        assert score_return_1d(-0.5) == 20
+        assert score_return_1d(0.0) == 50
+        assert score_return_1d(0.9) == 50
+        assert score_return_1d(1.0) == 75
+        assert score_return_1d(2.9) == 75
+        assert score_return_1d(3.0) == 90
+        assert score_return_1d(10.0) == 90
+
+
+class TestScoreReturn5d:
+    def test_buckets(self):
+        assert score_return_5d(-5.0) == 0
+        assert score_return_5d(-1.0) == 15
+        assert score_return_5d(0.0) == 40
+        assert score_return_5d(1.9) == 40
+        assert score_return_5d(2.0) == 70
+        assert score_return_5d(5.0) == 90
+        assert score_return_5d(9.9) == 90
+        assert score_return_5d(10.0) == 100
+        assert score_return_5d(15.0) == 100
+        assert score_return_5d(15.01) == 65
+        assert score_return_5d(30.0) == 65
+
+
+class TestScoreReturn20d:
+    def test_buckets(self):
+        assert score_return_20d(-10.0) == 0
+        assert score_return_20d(-1.0) == 20
+        assert score_return_20d(0.0) == 50
+        assert score_return_20d(4.9) == 50
+        assert score_return_20d(5.0) == 80
+        assert score_return_20d(15.0) == 100
+        assert score_return_20d(25.0) == 100
+        assert score_return_20d(25.01) == 75
+
+
+class TestConsistencyMultiplier:
+    def test_all_positive(self):
+        assert consistency_multiplier(1, 1, 1) == 1.10
+
+    def test_two_positive(self):
+        assert consistency_multiplier(1, 1, -1) == 1.00
+        assert consistency_multiplier(-1, 1, 1) == 1.00
+
+    def test_one_positive(self):
+        assert consistency_multiplier(1, -1, -1) == 0.85
+
+    def test_all_negative_or_zero(self):
+        assert consistency_multiplier(-1, -1, -1) == 0.70
+        assert consistency_multiplier(0, 0, 0) == 0.70
+
+
 class TestPriceVolatilityScore:
+    def test_all_negative_floor(self):
+        # All negative → mult 0.70; all score 0 → 0
+        assert price_volatility_score(-5, -10, -10) == 0
+
+    def test_strong_aligned_uptrend_caps_100(self):
+        # 1d=2 (75), 5d=12 (100), 20d=20 (100), all+ ⇒ mult 1.10
+        # base = 0.15*75 + 0.50*100 + 0.35*100 = 11.25 + 50 + 35 = 96.25
+        # × 1.10 = 105.875 → capped at 100
+        assert price_volatility_score(2, 12, 20) == pytest.approx(100.0)
+
+    def test_mixed_two_positive(self):
+        # 1d=0.5 (50), 5d=3 (70), 20d=-1 (20). 2 pos ⇒ mult 1.00
+        # base = 0.15*50 + 0.50*70 + 0.35*20 = 7.5 + 35 + 7 = 49.5
+        assert price_volatility_score(0.5, 3, -1) == pytest.approx(49.5)
+
+    def test_one_positive_penalty(self):
+        # 1d=-0.5 (20), 5d=-1 (15), 20d=6 (80). 1 pos ⇒ mult 0.85
+        # base = 0.15*20 + 0.50*15 + 0.35*80 = 3 + 7.5 + 28 = 38.5
+        # × 0.85 = 32.725
+        assert price_volatility_score(-0.5, -1, 6) == pytest.approx(32.725)
+
+
+class TestScorePriceVsMa20:
+    def test_buckets(self):
+        assert score_price_vs_ma20(-3) == 0
+        assert score_price_vs_ma20(-1) == 15
+        assert score_price_vs_ma20(0) == 75
+        assert score_price_vs_ma20(1.4) == 75
+        assert score_price_vs_ma20(1.5) == 90
+        assert score_price_vs_ma20(3.4) == 90
+        assert score_price_vs_ma20(3.5) == 65
+        assert score_price_vs_ma20(5.9) == 65
+        assert score_price_vs_ma20(6) == 30
+        assert score_price_vs_ma20(8.9) == 30
+        assert score_price_vs_ma20(9) == 0
+        assert score_price_vs_ma20(20) == 0
+
+
+class TestScorePriceVsMa50:
+    def test_buckets(self):
+        assert score_price_vs_ma50(-3) == 0
+        assert score_price_vs_ma50(-1) == 15
+        assert score_price_vs_ma50(0) == 50
+        assert score_price_vs_ma50(2.9) == 50
+        assert score_price_vs_ma50(3) == 80
+        assert score_price_vs_ma50(7.9) == 80
+        assert score_price_vs_ma50(8) == 100
+        assert score_price_vs_ma50(15) == 100
+        assert score_price_vs_ma50(15.01) == 70
+
+
+class TestScoreAlignment:
+    def test_buckets(self):
+        assert score_alignment(-5) == 0
+        assert score_alignment(-2) == 20
+        assert score_alignment(-0.5) == 40
+        assert score_alignment(0) == 65
+        assert score_alignment(0.9) == 65
+        assert score_alignment(1) == 85
+        assert score_alignment(2.9) == 85
+        assert score_alignment(3) == 100
+        assert score_alignment(10) == 100
+
+
+class TestScoreSlopeMa20:
+    def test_buckets(self):
+        assert score_slope_ma20(-0.5) == 0
+        assert score_slope_ma20(-0.1) == 15
+        assert score_slope_ma20(0) == 40
+        assert score_slope_ma20(0.29) == 40
+        assert score_slope_ma20(0.3) == 70
+        assert score_slope_ma20(0.59) == 70
+        assert score_slope_ma20(0.6) == 100
+        assert score_slope_ma20(2.0) == 100
+
+
+class TestScoreSlopeMa50:
+    def test_buckets(self):
+        assert score_slope_ma50(-0.5) == 0
+        assert score_slope_ma50(-0.1) == 20
+        assert score_slope_ma50(0) == 50
+        assert score_slope_ma50(0.19) == 50
+        assert score_slope_ma50(0.2) == 80
+        assert score_slope_ma50(0.39) == 80
+        assert score_slope_ma50(0.4) == 100
+
+
+class TestMaScoreComposite:
+    def test_max(self):
+        # All sub-scores 100 ⇒ ma_score 100
+        assert ma_score(2.0, 10.0, 5.0, 1.0, 0.5) == pytest.approx(100.0)
+
+    def test_weights_sum(self):
+        # pv_ma20=2 (90), pv_ma50=5 (80), align=2 (85), slope20=0.5 (70), slope50=0.3 (80)
+        # s_slope = 0.55*70 + 0.45*80 = 38.5 + 36 = 74.5
+        # ma_score = 0.35*90 + 0.20*80 + 0.20*85 + 0.25*74.5
+        #         = 31.5 + 16 + 17 + 18.625 = 83.125
+        assert ma_score(2.0, 5.0, 2.0, 0.5, 0.3) == pytest.approx(83.125)
+
+
+class TestCalRsWeighted:
+    def test_weights_065_for_1m(self):
+        # rs_3m=4, rs_1m=10 → 0.35*4 + 0.65*10 = 1.4 + 6.5 = 7.9
+        assert cal_rs_weighted(4, 10) == pytest.approx(7.9)
+
     def test_negative(self):
-        assert price_volatility_score(-1) == 0
-
-    def test_0_to_1(self):
-        assert price_volatility_score(0) == 20
-        assert price_volatility_score(0.9) == 20
-
-    def test_1_to_2(self):
-        assert price_volatility_score(1.0) == 40
-        assert price_volatility_score(1.9) == 40
-
-    def test_2_to_4(self):
-        assert price_volatility_score(2.0) == 60
-        assert price_volatility_score(3.5) == 60
-
-    def test_4_to_7(self):
-        assert price_volatility_score(4.0) == 80
-        assert price_volatility_score(6.5) == 80
-
-    def test_above_7(self):
-        assert price_volatility_score(7.0) == 100
-        assert price_volatility_score(10.0) == 100
+        # 0.35*-2 + 0.65*-4 = -0.7 - 2.6 = -3.3
+        assert cal_rs_weighted(-2, -4) == pytest.approx(-3.3)
 
 
-class TestScorePriceVsMa:
-    def test_below_ma(self):
-        assert score_price_vs_ma(-1) == 0
+class TestRsBaseScore:
+    def test_buckets(self):
+        assert rs_base_score(20) == 100
+        assert rs_base_score(15.01) == 100
+        assert rs_base_score(15) == 85
+        assert rs_base_score(8.01) == 85
+        assert rs_base_score(8) == 65
+        assert rs_base_score(3.01) == 65
+        assert rs_base_score(3) == 45
+        assert rs_base_score(0.01) == 45
+        assert rs_base_score(0) == 20
+        assert rs_base_score(-4.99) == 20
+        assert rs_base_score(-5) == 0
+        assert rs_base_score(-10) == 0
 
-    def test_0_to_2(self):
-        assert score_price_vs_ma(0) == 40
-        assert score_price_vs_ma(1.9) == 40
 
-    def test_2_to_5(self):
-        assert score_price_vs_ma(2.0) == 70
-        assert score_price_vs_ma(4.9) == 70
-
-    def test_above_5(self):
-        assert score_price_vs_ma(5.0) == 100
-        assert score_price_vs_ma(10.0) == 100
-
-
-class TestScoreSlopePct:
-    def test_negative(self):
-        assert score_slope_pct(-1) == 0
-
-    def test_0_to_0_2(self):
-        assert score_slope_pct(0) == 30
-        assert score_slope_pct(0.19) == 30
-
-    def test_0_2_to_0_5(self):
-        assert score_slope_pct(0.2) == 60
-        assert score_slope_pct(0.49) == 60
-
-    def test_above_0_5(self):
-        assert score_slope_pct(0.5) == 100
-        assert score_slope_pct(1.0) == 100
+class TestRsAccelerationMult:
+    def test_buckets(self):
+        # accel = rs_1m - rs_3m
+        assert rs_acceleration_mult(10, 0) == 1.10   # accel=10
+        assert rs_acceleration_mult(5, 0) == 1.00    # accel=5
+        assert rs_acceleration_mult(0, 0) == 0.90    # accel=0
+        assert rs_acceleration_mult(-5, 0) == 0.90   # accel=-5
+        assert rs_acceleration_mult(-6, 0) == 0.80   # accel=-6
 
 
 class TestRsScore:
-    def test_above_10(self):
-        assert rs_score(10.1) == 100
-        assert rs_score(20) == 100
+    def test_cap_at_100(self):
+        # base 100, mult 1.10 → 110, capped 100
+        # rs_w=20, rs_1m=10, rs_3m=0 (accel=10 ⇒ mult 1.10)
+        assert rs_score(20, 10, 0) == pytest.approx(100.0)
 
-    def test_5_to_10(self):
-        assert rs_score(5.1) == 80
-        assert rs_score(9.9) == 80
+    def test_base_only(self):
+        # base 65, mult 1.00 (accel=3 ⇒ mult 1.00)
+        # rs_w=5 ⇒ base 65
+        assert rs_score(5, 3, 0) == pytest.approx(65.0)
 
-    def test_0_to_5(self):
-        assert rs_score(0.1) == 60
-        assert rs_score(4.9) == 60
+    def test_acceleration_penalty(self):
+        # base 85, mult 0.80 (accel=-6) → 68
+        assert rs_score(10, -3, 3) == pytest.approx(85 * 0.80)
 
-    def test_minus5_to_0(self):
-        assert rs_score(-0.1) == 40
-        assert rs_score(-4.9) == 40
-
-    def test_below_minus5(self):
-        assert rs_score(-5) == 20
-        assert rs_score(-10) == 20
+    def test_zero(self):
+        # rs_w=-10 ⇒ base 0
+        assert rs_score(-10, -5, -3) == 0
 
 
 class TestAdScore:

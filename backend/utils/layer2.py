@@ -158,18 +158,27 @@ def cal_buy_score(
     ret_5d  = cal_return_n_days(close_today, close_arr[-6])
     ret_20d = cal_return_n_days(close_today, close_arr[-21])
     composite_ret = cal_composite_return(ret_1d, ret_5d, ret_20d)
-    s_volatility = price_volatility_score(composite_ret)
+    s_volatility = price_volatility_score(ret_1d, ret_5d, ret_20d)
+    s_ret_1d  = score_return_1d(ret_1d)
+    s_ret_5d  = score_return_5d(ret_5d)
+    s_ret_20d = score_return_20d(ret_20d)
+    consistency_mult = consistency_multiplier(ret_1d, ret_5d, ret_20d)
 
-    ma20_today   = cal_ma(close_arr, 20)
-    ma50_today   = cal_ma(close_arr, 50)
-    ma20_5d_ago  = cal_ma_n_days_ago(close_arr, 20, 5)
-    pv_ma20      = cal_price_vs_ma(close_today, ma20_today)
-    pv_ma50      = cal_price_vs_ma(close_today, ma50_today)
-    slope_val    = cal_slope_pct(ma20_today, ma20_5d_ago)
-    s_pv_ma20    = score_price_vs_ma(pv_ma20)
-    s_pv_ma50    = score_price_vs_ma(pv_ma50)
-    s_slope      = score_slope_pct(slope_val)
-    s_ma         = ma_score(pv_ma20, pv_ma50, slope_val)
+    ma20_today    = cal_ma(close_arr, 20)
+    ma50_today    = cal_ma(close_arr, 50)
+    ma20_10d_ago  = cal_ma_n_days_ago(close_arr, 20, 10)
+    ma50_10d_ago  = cal_ma_n_days_ago(close_arr, 50, 10)
+    pv_ma20       = cal_price_vs_ma(close_today, ma20_today)
+    pv_ma50       = cal_price_vs_ma(close_today, ma50_today)
+    ma20_vs_ma50  = (ma20_today - ma50_today) / ma50_today * 100
+    slope_ma20    = cal_slope_pct(ma20_today, ma20_10d_ago)
+    slope_ma50    = cal_slope_pct(ma50_today, ma50_10d_ago)
+    s_pv_ma20     = score_price_vs_ma20(pv_ma20)
+    s_pv_ma50     = score_price_vs_ma50(pv_ma50)
+    s_align       = score_alignment(ma20_vs_ma50)
+    s_slope_ma20  = score_slope_ma20(slope_ma20)
+    s_slope_ma50  = score_slope_ma50(slope_ma50)
+    s_ma          = ma_score(pv_ma20, pv_ma50, ma20_vs_ma50, slope_ma20, slope_ma50)
 
     stock_r3m = stock_return_n_days(close_arr[-1], close_arr[-64]) if len(close_arr) >= 64 else 0
     stock_r1m = stock_return_n_days(close_arr[-1], close_arr[-22]) if len(close_arr) >= 22 else 0
@@ -178,7 +187,8 @@ def cal_buy_score(
     rs_3m_val = cal_rs(stock_r3m, vn_r3m)
     rs_1m_val = cal_rs(stock_r1m, vn_r1m)
     rs_w_val  = cal_rs_weighted(rs_3m_val, rs_1m_val)
-    s_rs      = rs_score(rs_w_val)
+    s_rs      = rs_score(rs_w_val, rs_1m_val, rs_3m_val)
+    rs_accel_mult_val = rs_acceleration_mult(rs_1m_val, rs_3m_val)
 
     ad_val    = cal_ad_ratio(close_arr[-21:], vol_arr[-21:])
     s_ad      = ad_score(ad_val)
@@ -204,19 +214,31 @@ def cal_buy_score(
     mom_breakdown = {
         "composite_return": {
             "value": composite_ret, "score": s_volatility,
-            "detail": {"return_1d": ret_1d, "return_5d": ret_5d, "return_20d": ret_20d},
+            "detail": {
+                "return_1d":  {"value": ret_1d,  "score": s_ret_1d},
+                "return_5d":  {"value": ret_5d,  "score": s_ret_5d},
+                "return_20d": {"value": ret_20d, "score": s_ret_20d},
+                "consistency_mult": consistency_mult,
+            },
         },
         "ma": {
             "score": s_ma,
             "detail": {
-                "price_vs_ma20": {"value": pv_ma20, "score": s_pv_ma20},
-                "price_vs_ma50": {"value": pv_ma50, "score": s_pv_ma50},
-                "slope_pct": {"value": slope_val, "score": s_slope},
+                "price_vs_ma20": {"value": pv_ma20,      "score": s_pv_ma20},
+                "price_vs_ma50": {"value": pv_ma50,      "score": s_pv_ma50},
+                "alignment":     {"value": ma20_vs_ma50, "score": s_align},
+                "slope_ma20":    {"value": slope_ma20,   "score": s_slope_ma20},
+                "slope_ma50":    {"value": slope_ma50,   "score": s_slope_ma50},
             },
         },
         "rs": {
             "value": rs_w_val, "score": s_rs,
-            "detail": {"rs_3m": rs_3m_val, "rs_1m": rs_1m_val},
+            "detail": {
+                "rs_3m": rs_3m_val,
+                "rs_1m": rs_1m_val,
+                "acceleration": rs_1m_val - rs_3m_val,
+                "accel_mult": rs_accel_mult_val,
+            },
         },
         "ad": {"value": ad_val, "score": s_ad},
         "smart_money": {"score": s_smart_money, "detail": {"foreign_net_pct": f_pct, "prop_net_pct": p_pct}},
@@ -435,114 +457,111 @@ def momentum_score(price_volatility_score, ma_score, rs_score, ad_score, smart_m
     return (w[0] * price_volatility_score + w[1] * ma_score + w[2] * rs_score
             + w[3] * ad_score + w[4] * smart_money_score + w[5] * technical_confirmation_score)
 
-# Diem bien dong gia composite
-"""
-_Mã có đang chạy mạnh hơn bình thường không - xét đa khung thời gian để lọc noise?_
-return_1d = (close_hôm_nay - close_1d_trước) / close_1d_trước × 100
-return_5d = (close_hôm_nay - close_5d_trước) / close_5d_trước × 100
-return_20d = (close_hôm_nay - close_20d_trước) / close_20d_trước × 100
-composite = 0.25 × return_1d + 0.45 × return_5d + 0.30 × return_20d
-_(Trọng số 25/45/30: 5D (~1 tuần) khớp với holding period swing. 20D xác nhận nền momentum. 1D chỉ là trigger nhỏ.)_
-
-| **Composite return** | **Điểm** |
-| -------------------- | -------- |
-| < 0%                 | 0        |
-| 0-1%                 | 20       |
-| 1-2%                 | 40       |
-| 2-4%                 | 60       |
-| 4-7%                 | 80       |
-| > 7%                | 100      |
-"""
+# Diem bien dong gia composite (RevC: per-timeframe scoring + consistency multiplier)
+# Spec: docs/filter.md §3.2.1
 def cal_return_n_days(close_today, close_n_days_ago):
     return (close_today - close_n_days_ago) / close_n_days_ago * 100
 
 def cal_composite_return(return_1d, return_5d, return_20d):
-    return 0.25 * return_1d + 0.45 * return_5d + 0.30 * return_20d
+    # Display-only weighted return (kept for breakdown.value rendering)
+    return 0.15 * return_1d + 0.50 * return_5d + 0.35 * return_20d
 
-def price_volatility_score(composite_return):
-    if composite_return < 0:
-        return 0
-    elif 0 <= composite_return < 1:
-        return 20
-    elif 1 <= composite_return < 2:
-        return 40
-    elif 2 <= composite_return < 4:
-        return 60
-    elif 4 <= composite_return < 7:
-        return 80
-    else:
-        return 100
+def score_return_1d(r: float) -> float:
+    if r < -1:   return 0
+    if r < 0:    return 20
+    if r < 1:    return 50
+    if r < 3:    return 75
+    return 90
 
-# Diem phan tich MA
-"""
-Điểm này đo 2 thứ
+def score_return_5d(r: float) -> float:
+    if r < -3:   return 0
+    if r < 0:    return 15
+    if r < 2:    return 40
+    if r < 5:    return 70
+    if r < 10:   return 90
+    if r <= 15:  return 100
+    return 65  # extended weekly soft cap
 
-**1. Vị trí giá so với MA - "Giá đang ở đâu?"**
+def score_return_20d(r: float) -> float:
+    if r < -5:   return 0
+    if r < 0:    return 20
+    if r < 5:    return 50
+    if r < 15:   return 80
+    if r <= 25:  return 100
+    return 75   # extended monthly soft cap
 
-Giá > MA50 > MA20 → Bullish alignment → điểm cao
+def consistency_multiplier(r1: float, r5: float, r20: float) -> float:
+    pos = sum(1 for r in (r1, r5, r20) if r > 0)
+    if pos == 3: return 1.10
+    if pos == 2: return 1.00
+    if pos == 1: return 0.85
+    return 0.70
 
-Giá < MA20 → Yếu → điểm thấp/0
+def price_volatility_score(ret_1d: float, ret_5d: float, ret_20d: float) -> float:
+    s = (0.15 * score_return_1d(ret_1d)
+       + 0.50 * score_return_5d(ret_5d)
+       + 0.35 * score_return_20d(ret_20d))
+    return min(100.0, s * consistency_multiplier(ret_1d, ret_5d, ret_20d))
 
-**2. Độ dốc MA20 - "Momentum có đang tăng tốc không?"**
+# Diem phan tich MA (RevC: 4 components, 10-phien slope lookback, composite MA20+MA50)
+# Spec: docs/filter.md §3.2.2
 
-slope_pct = (MA20_hôm_nay - MA20_cách_5_phiên) / MA20_cách_5_phiên × 100
-
-ma20 = mean(close, 20)
-ma50 = mean(close, 50)
-slope_pct = (ma20_today - ma20_5d_ago) / ma20_5d_ago × 100
-price_vs_ma20 = (close_today - ma20) / ma20 × 100
-price_vs_ma50 = (close_today - ma50) / ma50 × 100
-
-Bảng điểm áp dụng chung cho cả MA20 và MA50:
-| **% so với MA** | **Điểm** |
-| --------------- | -------- |
-| Dưới MA (< 0%)  | 0        |
-| 0-2% trên       | 40       |
-| 2-5% trên       | 70       |
-| > 5% trên      | 100      |
-
-Slope MA20:
-| **Slope%** | **Điểm** |
-| ---------- | -------- |
-| < 0%       | 0        |
-| 0-0.2%     | 30       |
-| 0.2-0.5%   | 60       |
-| > 0.5%    | 100      |
-
-score_ma = 0.35 × score(price_vs_ma20) + 0.30 × score(price_vs_ma50) + 0.35 × score(slope_pct)
-"""
-
-def cal_slope_pct(ma20_today, ma20_5d_ago):
-    return (ma20_today - ma20_5d_ago) / ma20_5d_ago * 100
+def cal_slope_pct(ma_today, ma_n_days_ago):
+    return (ma_today - ma_n_days_ago) / ma_n_days_ago * 100
 
 def cal_price_vs_ma(close_today, ma):
     return (close_today - ma) / ma * 100
 
-def score_price_vs_ma(price_vs_ma):
-    if price_vs_ma < 0:
-        return 0
-    elif 0 <= price_vs_ma < 2:
-        return 40
-    elif 2 <= price_vs_ma < 5:
-        return 70
-    else:
-        return 100
+def score_price_vs_ma20(pv: float) -> float:
+    if pv < -2:    return 0
+    if pv < 0:     return 15
+    if pv < 1.5:   return 75
+    if pv < 3.5:   return 90
+    if pv < 6:     return 65
+    if pv < 9:     return 30
+    return 0
 
-def score_slope_pct(slope_pct):
-    if slope_pct < 0:
-        return 0
-    elif 0 <= slope_pct < 0.2:
-        return 30
-    elif 0.2 <= slope_pct < 0.5:
-        return 60
-    else:
-        return 100
+def score_price_vs_ma50(pv: float) -> float:
+    if pv < -2:    return 0
+    if pv < 0:     return 15
+    if pv < 3:     return 50
+    if pv < 8:     return 80
+    if pv <= 15:   return 100
+    return 70
 
-def ma_score(price_vs_ma20, price_vs_ma50, slope_pct):
-    score20 = score_price_vs_ma(price_vs_ma20)
-    score50 = score_price_vs_ma(price_vs_ma50)
-    score_slope = score_slope_pct(slope_pct)
-    return 0.35 * score20 + 0.30 * score50 + 0.35 * score_slope
+def score_alignment(ma20_vs_ma50_pct: float) -> float:
+    x = ma20_vs_ma50_pct
+    if x < -3:     return 0
+    if x < -1:     return 20
+    if x < 0:      return 40
+    if x < 1:      return 65
+    if x < 3:      return 85
+    return 100
+
+def score_slope_ma20(slope: float) -> float:
+    if slope < -0.3:  return 0
+    if slope < 0:     return 15
+    if slope < 0.3:   return 40
+    if slope < 0.6:   return 70
+    return 100
+
+def score_slope_ma50(slope: float) -> float:
+    if slope < -0.2:  return 0
+    if slope < 0:     return 20
+    if slope < 0.2:   return 50
+    if slope < 0.4:   return 80
+    return 100
+
+def ma_score(
+    pv_ma20: float, pv_ma50: float,
+    ma20_vs_ma50_pct: float,
+    slope_ma20_pct: float, slope_ma50_pct: float,
+) -> float:
+    s_slope = 0.55 * score_slope_ma20(slope_ma20_pct) + 0.45 * score_slope_ma50(slope_ma50_pct)
+    return (0.35 * score_price_vs_ma20(pv_ma20)
+          + 0.20 * score_price_vs_ma50(pv_ma50)
+          + 0.20 * score_alignment(ma20_vs_ma50_pct)
+          + 0.25 * s_slope)
 
 # Diem suc manh tuong doi vs VN-Index (RS)
 """
@@ -574,20 +593,27 @@ def vnindex_return_n_days(vnindex_close_today, vnindex_close_n_days_ago):
 def cal_rs(stock_return, vnindex_return):
     return stock_return - vnindex_return
 
-def cal_rs_weighted(rs_3m, rs_1m):
+def cal_rs_weighted(rs_3m: float, rs_1m: float) -> float:
+    # RevC: 1M weighted heavier — need leader emerging now
     return 0.35 * rs_3m + 0.65 * rs_1m
 
-def rs_score(rs_weighted):
-    if rs_weighted > 10:
-        return 100
-    elif 5 < rs_weighted <= 10:
-        return 80
-    elif 0 < rs_weighted <= 5:
-        return 60
-    elif -5 < rs_weighted <= 0:
-        return 40
-    else:
-        return 20
+def rs_base_score(rs_weighted: float) -> float:
+    if rs_weighted > 15:   return 100
+    if rs_weighted > 8:    return 85
+    if rs_weighted > 3:    return 65
+    if rs_weighted > 0:    return 45
+    if rs_weighted > -5:   return 20
+    return 0
+
+def rs_acceleration_mult(rs_1m: float, rs_3m: float) -> float:
+    accel = rs_1m - rs_3m
+    if accel > 5:    return 1.10
+    if accel > 0:    return 1.00
+    if accel > -5:   return 0.90
+    return 0.80
+
+def rs_score(rs_weighted: float, rs_1m: float = 0.0, rs_3m: float = 0.0) -> float:
+    return min(100.0, rs_base_score(rs_weighted) * rs_acceleration_mult(rs_1m, rs_3m))
 
 # Diem tich luy / phan phoi (A/D Ratio)
 """
