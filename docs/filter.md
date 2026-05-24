@@ -292,7 +292,7 @@ return_20d = (close_hôm_nay - close_20d_trước) / close_20d_trước × 100
 | Cả 3 dương      | **× 1.10**     | Momentum aligned - bonus 10%    | +1% / +6% / +12% → tăng đều mọi khung   |
 | 2/3 dương       | × 1.00         | Tín hiệu ổn - không điều chỉnh  | +0.5% / +5% / −2% → tháng pullback nhẹ  |
 | 1/3 dương       | × 0.85         | Mixed signals - penalty 15%     | −0.5% / −3% / +18% → đảo chiều ngắn hạn |
-| 0/3 âm          | **× 0RevC.70**     | Momentum tiêu cực - penalty 30% | −2% / −5% / −8% → downtrend toàn khung  |
+| 0/3 âm          | **× 0.70**     | Momentum tiêu cực - penalty 30% | −2% / −5% / −8% → downtrend toàn khung  |
 
 **composite = (0.15 × return_1d + 0.5 × return_5d + 0.35 × return_20d)\* consistency_mult**
 
@@ -461,7 +461,7 @@ _Phương pháp VCP phát hiện rằng các "leading stock" luôn outperform in
 
 _\# Ưu tiên 3 tháng gần nhất cho lướt sóng (VCP dùng 12 tháng cho swing dài hơn)_
 
-### **1\. Công thức tổng hợp**
+**1\. Công thức tổng hợp**
 
 | **Bước**                  | **Công thức**                                   | **Ghi chú**                                                                                                                                                                                                                                                                                                                                                                  |
 | ------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -482,7 +482,7 @@ _\# Ưu tiên 3 tháng gần nhất cho lướt sóng (VCP dùng 12 tháng cho s
 | −5% → 0%        | 20       | Underperform nhẹ                   |
 | < −5%           | **0**    | Underperform rõ - không ưu tiên    |
 
-### **3\. Bảng RS Acceleration Multiplier**
+**3\. Bảng RS Acceleration Multiplier**
 
 | **rs_1m − rs_3m** | **Multiplier** | **Ý nghĩa**                                     |
 | ----------------- | -------------- | ----------------------------------------------- |
@@ -491,7 +491,7 @@ _\# Ưu tiên 3 tháng gần nhất cho lướt sóng (VCP dùng 12 tháng cho s
 | −5% → 0%          | × 0.90         | RS đang chậm lại - cảnh báo                     |
 | < −5%             | **× 0.80**     | Ex-leader - RS mất sức rõ ràng                  |
 
-### Điểm tích lũy/phân phối (A/D Ratio)
+#### Điểm tích lũy/phân phối (A/D Ratio)
 
 _Tham khảo từ: CANSLIM - S component (Supply & Demand, 15% weight). CANSLIM S component phát hiện smart money đang mua hay bán. Nếu volume ngày tăng giá > volume ngày giảm giá → tổ chức đang tích lũy → momentum có nền tảng. Đây là tín hiệu SỚM hơn breakout, giúp phân biệt breakout có dòng tiền thật hay không._
 
@@ -503,13 +503,14 @@ down_days_vol = \[volume\[i\] for i in range(20) if close\[i\] < close\[i-1\]\]
 
 ad_ratio = mean(up_days_vol) / mean(down_days_vol)
 
-| **A/D ratio** | **Điểm** | **Ý nghĩa**                     |
-| ------------- | -------- | ------------------------------- |
-| ≥ 2.0         | 100      | Tích lũy mạnh (smart money vào) |
-| 1.5-2.0       | 80       | Tích lũy rõ ràng                |
-| 1.0-1.5       | 60       | Trung tính / tích lũy nhẹ       |
-| 0.7-1.0       | 40       | Phân phối nhẹ                   |
-| < 0.7         | 20       | Phân phối rõ (smart money ra)   |
+| **A/D ratio** | **Điểm** | **Ý nghĩa**                                                   |
+| ------------- | -------- | ------------------------------------------------------------- |
+| ≥ 2.0         | 100      | Tích lũy mạnh (smart money vào)                               |
+| 1.5-2.0       | 80       | Tích lũy rõ ràng                                              |
+| 1.0-1.5       | 60       | Trung tính / tích lũy nhẹ                                     |
+| 0.7-1.0       | 40       | Phân phối nhẹ                                                 |
+| < 0.7         | 20       | Phân phối rõ (smart money ra)                                 |
+| ∞             | 100      | Cả 20 phiên tăng giá -> mean(down_days_vol) = 0 → chia cho 0. |
 
 ### Điểm Smart Money Flow
 
@@ -525,7 +526,7 @@ foreign_buy_value - foreign_sell_value: mua ròng của từng ngày
 
 foreign_net_5d : Cộng 5 ngày gần nhất lại → tổng dòng tiền ròng khối ngoại trong 1 tuần
 
-**foreign_net_pct = foreign_net_5d / (GTGD20 × 5) × 100**: Chuẩn hóa theo quy mô giao dịch để tính tỉ lệ tương đối % sẽ chính xác hơn là lấy giá trị tuyệt đối do tỉ lệ mua ròng lớn hay nhỏ không chỉ phụ thuộc vào giá trị tuyệt đối mà còn phụ thuộc vào mã. Ví dụ HPG giao dịch 500 tỷ/ngày → 90 tỷ chỉ chiếm tỷ lệ nhỏ nhưng một mã mid-cap giao dịch 30 tỷ/ngày → 90 tỷ là rất lớn
+**foreign_net_pct = foreign_net_5d / sum(GTGD thực tế 5 phiên) × 100**: Chuẩn hóa theo quy mô giao dịch để tính tỉ lệ tương đối % sẽ chính xác hơn là lấy giá trị tuyệt đối do tỉ lệ mua ròng lớn hay nhỏ không chỉ phụ thuộc vào giá trị tuyệt đối mà còn phụ thuộc vào mã. Ví dụ HPG giao dịch 500 tỷ/ngày → 90 tỷ chỉ chiếm tỷ lệ nhỏ nhưng một mã mid-cap giao dịch 30 tỷ/ngày → 90 tỷ là rất lớn
 
 | Foreign net % (5d) | Điểm | Ý nghĩa                      |
 | ------------------ | ---- | ---------------------------- |
@@ -540,7 +541,7 @@ foreign_net_5d : Cộng 5 ngày gần nhất lại → tổng dòng tiền ròng
 
 prop_net_5d = sum(prop_buy_value - prop_sell_value, 5_phiên) # VND
 
-prop_net_pct = prop_net_5d / (GTGD20 × 5) × 100
+prop_net_pct = prop_net_5d / sum(GTGD thực tế 5 phiên) × 100
 
 | Prop net % (5d)  | Điểm | Ý nghĩa                |
 | ---------------- | ---- | ---------------------- |
