@@ -6,12 +6,17 @@ import { usePathname } from "next/navigation";
 const NAV = [
   { href: "/layer1", label: "Layer 01", title: "Hard filters" },
   { href: "/layer2", label: "Layer 02", title: "BUY score" },
+  { href: "/layer2/log", label: "Layer 02", title: "Log breakdown" },
   { href: "/agent", label: "Agent", title: "Trading Agent" },
   { href: "/chat", label: "Assistant", title: "Stock chat" },
 ];
 
 export function TopNav() {
   const pathname = usePathname();
+  // Longest matching href wins so /layer2/log doesn't also light up /layer2.
+  const activeHref = NAV.filter(
+    (i) => pathname === i.href || pathname.startsWith(i.href + "/"),
+  ).sort((a, b) => b.href.length - a.href.length)[0]?.href;
   return (
     <header className="sticky top-0 z-50 border-b border-[var(--color-line)] bg-[var(--color-bg)]/95 backdrop-blur">
       <div className="flex h-16 items-stretch">
@@ -35,7 +40,7 @@ export function TopNav() {
         {/* Routes */}
         <nav className="flex items-stretch">
           {NAV.map((item) => {
-            const active = pathname.startsWith(item.href);
+            const active = item.href === activeHref;
             return (
               <Link
                 key={item.href}

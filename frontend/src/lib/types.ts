@@ -91,6 +91,8 @@ export interface ScoreBreakdown {
   liquidity: LiquidityBreakdown;
   momentum: MomentumBreakdown;
   breakout: BreakoutBreakdown;
+  // Full raw inputs + intermediates for cross-checking. Shape is intentionally loose.
+  debug?: Record<string, unknown>;
 }
 
 export interface Layer2Score {

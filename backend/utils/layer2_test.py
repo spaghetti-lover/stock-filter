@@ -485,6 +485,28 @@ class TestAdScore:
         assert ad_score(0.0) == 20
 
 
+class TestCalAdRatio:
+    def test_all_sessions_up_returns_999(self):
+        # Spec 3.2.4 edge: all 20 sessions up => mean(down_days_vol)=0 => division by zero
+        # => return 999 (∞ proxy) => ad_score = 100
+        close = [10.0 + i for i in range(21)]   # strictly increasing
+        volume = [1000.0] * 21
+        assert cal_ad_ratio(close, volume) == 999.0
+        assert ad_score(cal_ad_ratio(close, volume)) == 100
+
+    def test_all_sessions_down_returns_0(self):
+        close = [30.0 - i for i in range(21)]   # strictly decreasing
+        volume = [1000.0] * 21
+        assert cal_ad_ratio(close, volume) == 0.0
+
+    def test_mixed_ratio(self):
+        # up days vol mean / down days vol mean
+        close = [10.0, 11.0, 10.0, 11.0]  # up, down, up
+        volume = [0.0, 200.0, 100.0, 200.0]
+        # up_vol = [200, 200] mean 200; down_vol = [100] mean 100 => 2.0
+        assert cal_ad_ratio(close, volume) == pytest.approx(2.0)
+
+
 class TestCalRsi:
     def test_neutral_fallback(self):
         assert cal_rsi([100.0] * 10) == 50.0

@@ -19,6 +19,7 @@ class BuyScoreBreakdown:
     liquidity: dict
     momentum: dict
     breakout: dict
+    debug: dict  # full raw inputs + intermediates for cross-checking every formula
 
 
 DEFAULT_WEIGHTS = {
@@ -288,6 +289,75 @@ def cal_buy_score(
         "gate_active": gate_active,
     }
 
+    # ── Debug: full raw inputs + intermediates (cross-check every formula) ──
+    gtgd_daily_all = cal_gtgd_daily(close_arr, vol_arr)
+    gtgd_5d_val    = sum(gtgd_daily_all[-6:-1])  # last 5 sessions excl. today (3.2.5 denominator)
+    ad_close       = close_arr[-21:]
+    ad_vol         = vol_arr[-21:]
+    up_vol_list    = cal_up_days_vol(ad_close, ad_vol)
+    down_vol_list  = cal_down_days_vol(ad_close, ad_vol)
+
+    if (foreign_buy_vals and foreign_sell_vals and len(foreign_buy_vals) >= 5
+            and prop_buy_vals and prop_sell_vals and len(prop_buy_vals) >= 5):
+        foreign_buy_5d  = foreign_buy_vals[:5]
+        foreign_sell_5d = foreign_sell_vals[:5]
+        prop_buy_5d     = prop_buy_vals[:5]
+        prop_sell_5d    = prop_sell_vals[:5]
+        foreign_net_5d  = sum(b - s for b, s in zip(foreign_buy_5d, foreign_sell_5d))
+        prop_net_5d     = sum(b - s for b, s in zip(prop_buy_5d, prop_sell_5d))
+        smart_data_ok   = True
+    else:
+        foreign_buy_5d = foreign_sell_5d = prop_buy_5d = prop_sell_5d = None
+        foreign_net_5d = prop_net_5d = None
+        smart_data_ok  = False
+
+    debug = {
+        "inputs": {
+            "close_21": ad_close,
+            "volume_21": ad_vol,
+            "high_21": high_arr[-21:],
+            "low_21": low_arr[-21:],
+            "vn_close_64": vn_close[-64:],
+            "minutes_elapsed": minutes_elapsed,
+            "n_sessions": len(history),
+            "position_size": position_size,
+        },
+        "gtgd": {
+            "gtgd_daily_21": gtgd_daily_all[-21:],
+            "gtgd20": gtgd20_val,
+            "gtgd_5d": gtgd_5d_val,
+            "avg_vol_20d": avg_vol_20d,
+        },
+        "intraday": {
+            "gtgd_intraday": gtgd_intraday,
+            "volume_intraday": volume_intraday_,
+            "gtgd_expected": gtgd20_val * (minutes_elapsed / 225) if minutes_elapsed else 0,
+        },
+        "ad": {
+            "up_days_vol": up_vol_list,
+            "down_days_vol": down_vol_list,
+            "up_count": len(up_vol_list),
+            "down_count": len(down_vol_list),
+            "mean_up": (sum(up_vol_list) / len(up_vol_list)) if up_vol_list else None,
+            "mean_down": (sum(down_vol_list) / len(down_vol_list)) if down_vol_list else None,
+            "ad_ratio": ad_val,
+            "note": "all 20 sessions up => down_count=0 => ad_ratio=999 => score 100",
+        },
+        "smart_money": {
+            "data_available": smart_data_ok,
+            "granularity": "end_of_day",  # foreign/prop buy-sell VALUE is per-session (EOD), no intraday
+            "foreign_buy_5d": foreign_buy_5d,
+            "foreign_sell_5d": foreign_sell_5d,
+            "foreign_net_5d": foreign_net_5d,
+            "prop_buy_5d": prop_buy_5d,
+            "prop_sell_5d": prop_sell_5d,
+            "prop_net_5d": prop_net_5d,
+            "gtgd_5d": gtgd_5d_val,
+            "foreign_net_pct": f_pct,
+            "prop_net_pct": p_pct,
+        },
+    }
+
     return BuyScoreBreakdown(
         buy_score=round(buy_score(s_liquidity, s_momentum, s_breakout), 2),
         liquidity_score=round(s_liquidity, 2),
@@ -296,6 +366,7 @@ def cal_buy_score(
         liquidity=liq_breakdown,
         momentum=mom_breakdown,
         breakout=brk_breakdown,
+        debug=debug,
     )
 
 

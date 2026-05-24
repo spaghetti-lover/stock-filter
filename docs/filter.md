@@ -558,6 +558,8 @@ Lưu ý: Ngưỡng proprietary thấp hơn foreign vì tự doanh thường giao
 
 smart_money_score = 0.60 × score(foreign_net_pct) + 0.40 × score(prop_net_pct)
 
+> **Lưu ý về dữ liệu (granularity):** Giá trị mua/bán (buy/sell **value**) của khối ngoại và tự doanh từ `vnstock_data` chỉ có ở mức **cuối phiên (end-of-day, per-session)** — không có dữ liệu intraday/realtime. `intraday()` chỉ trả `time/price/volume`; `price_board()` realtime chỉ có foreign buy/sell **volume** (không có value, không có tự doanh). Do đó component Smart Money Flow **không cập nhật trong phiên**: dù app refresh 5 phút/lần, giá trị này giữ nguyên theo phiên T-1 cho tới khi phiên mới chốt.
+
 ### Điểm xác nhận kỹ thuật score_technical (RSI + MACD)
 
 #### RSI 14 phiên

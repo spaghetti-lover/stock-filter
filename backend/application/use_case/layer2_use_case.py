@@ -80,6 +80,7 @@ class Layer2UseCase:
                             "liquidity": result.liquidity,
                             "momentum": result.momentum,
                             "breakout": result.breakout,
+                            "debug": result.debug,
                         },
                     )
                 except Exception:
