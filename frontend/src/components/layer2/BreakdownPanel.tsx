@@ -4,6 +4,7 @@ import { normalize, type Weights } from "@/lib/scoring";
 import { fmtBillion, fmtPct, fmtRatio, fmtScore, fmtPrice } from "@/lib/format";
 import { Pill } from "@/components/ui/Pill";
 import { PillarGauge } from "./PillarGauge";
+import { TradingViewChart } from "./TradingViewChart";
 import type { Layer2Score } from "@/lib/types";
 import type { RecomputedScores } from "@/lib/scoring";
 
@@ -49,6 +50,10 @@ export function BreakdownPanel({ stock, weights }: Props) {
           </div>
         </div>
       </header>
+
+      <div className="border-b border-[var(--color-line)] p-4">
+        <TradingViewChart symbol={stock.symbol} exchange={stock.exchange} />
+      </div>
 
       <div className="grid grid-cols-1 gap-px bg-[var(--color-line)] lg:grid-cols-3">
         {/* Liquidity */}
