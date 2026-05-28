@@ -24,9 +24,15 @@ const GROUPS: { title: string; keys: { key: string; label: string }[] }[] = [
       { key: "mom_volatility", label: "Price volatility" },
       { key: "mom_ma", label: "MA analysis" },
       { key: "mom_rs", label: "Relative strength" },
-      { key: "mom_ad", label: "A/D ratio" },
-      { key: "mom_smart_money", label: "Smart Money Flow" },
+      { key: "mom_flow", label: "Flow (A/D + SMF)" },
       { key: "mom_tech", label: "Technical (RSI+MACD)" },
+    ],
+  },
+  {
+    title: "Flow sub-weights",
+    keys: [
+      { key: "flow_ad", label: "A/D within flow" },
+      { key: "flow_smf", label: "SMF within flow" },
     ],
   },
   {

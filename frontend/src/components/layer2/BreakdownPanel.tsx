@@ -28,7 +28,7 @@ export function BreakdownPanel({ stock, weights }: Props) {
   };
 
   const nwL = normalize(weights, ["liq_gtgd20", "liq_intraday", "liq_cv"]);
-  const nwM = normalize(weights, ["mom_volatility", "mom_ma", "mom_rs", "mom_ad", "mom_tech"]);
+  const nwM = normalize(weights, ["mom_volatility", "mom_ma", "mom_rs", "mom_flow", "mom_tech"]);
   const gateActive = !!brk.gate_active;
 
   return (
@@ -74,7 +74,7 @@ export function BreakdownPanel({ stock, weights }: Props) {
         {/* Momentum */}
         <Column title="Momentum" score={r.mom}>
           <Caption>
-            Vol ({pct(nwM.mom_volatility)}) · MA ({pct(nwM.mom_ma)}) · RS ({pct(nwM.mom_rs)}) · A/D ({pct(nwM.mom_ad)}) · Tech ({pct(nwM.mom_tech)})
+            Vol ({pct(nwM.mom_volatility)}) · MA ({pct(nwM.mom_ma)}) · RS ({pct(nwM.mom_rs)}) · Flow ({pct(nwM.mom_flow)}) · Tech ({pct(nwM.mom_tech)})
           </Caption>
           <Metric
             label="Composite return"
@@ -94,7 +94,14 @@ export function BreakdownPanel({ stock, weights }: Props) {
             score={mom.rs.score}
             detail={detailMomRS(mom.rs.detail)}
           />
-          <Metric label="A/D ratio" value={fmtRatio(mom.ad.value)} score={mom.ad.score} />
+          {mom.flow ? (
+            <Metric
+              label="Flow (A/D + SMF)"
+              value={fmtScore(mom.flow.score)}
+              score={mom.flow.score}
+              detail={detailMomFlow(mom.flow.detail)}
+            />
+          ) : null}
           <Metric
             label="Technical"
             value=""
@@ -208,6 +215,20 @@ function detailMomRS(d: unknown): string {
   const o = obj(d);
   return `3M ${fmtPct(num(o.rs_3m))} · 1M ${fmtPct(num(o.rs_1m))}`;
 }
+function detailMomFlow(d: unknown): string {
+  const o = obj(d);
+  const ad   = num(o.score_ad);
+  const smf  = num(o.score_smf);
+  const mult = num(o.convergence_mult);
+  const fnp  = o.foreign_net_pct == null ? "n/a" : fmtPct(num(o.foreign_net_pct));
+  const pnp  = o.prop_net_pct    == null ? "n/a" : fmtPct(num(o.prop_net_pct));
+  const anp  = o.active_net_pct  == null ? "n/a" : fmtPct(num(o.active_net_pct));
+  const activeChip = o.score_active != null
+    ? ` · A ${fmtScore(num(o.score_active))} (${String(o.active_band ?? "")})`
+    : "";
+  return `AD ${fmtScore(ad)} (${String(o.ad_band ?? "")}) · SMF ${fmtScore(smf)} (${String(o.smf_band ?? "")})${activeChip} · ×${mult.toFixed(2)} · F ${fnp} P ${pnp} A ${anp}`;
+}
+
 function detailMomTech(d: unknown): string {
   const o = obj(d);
   const rsi = obj(o.rsi);

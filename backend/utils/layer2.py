@@ -1,5 +1,23 @@
 import statistics
 from dataclasses import dataclass
+from datetime import time as _time
+
+
+# 09:15 is when the continuous session opens (ATO is 09:00–09:15).
+# Spec §3.3.2 requires intraday volume/value to be measured from 09:15 onward.
+_ATO_END = _time(9, 15)
+
+
+def _is_continuous_tick(tick: dict) -> bool:
+    """True if a tick belongs to the continuous session (>= 09:15).
+
+    Ticks with no `time` key are kept — synthetic tests use bare
+    `{"price": ..., "volume": ...}` dicts.
+    """
+    t = tick.get("time")
+    if t is None:
+        return True
+    return t >= _ATO_END
 
 
 @dataclass
@@ -25,7 +43,8 @@ class BuyScoreBreakdown:
 DEFAULT_WEIGHTS = {
     "liquidity": 0.35, "momentum": 0.30, "breakout": 0.35,
     "liq_gtgd20": 0.55, "liq_intraday": 0.30, "liq_cv": 0.15,
-    "mom_volatility": 0.30, "mom_ma": 0.20, "mom_rs": 0.20, "mom_ad": 0.10, "mom_smart_money": 0.15, "mom_tech": 0.10,
+    "mom_volatility": 0.30, "mom_ma": 0.20, "mom_rs": 0.20, "mom_flow": 0.25, "mom_tech": 0.10,
+    "flow_ad": 0.40, "flow_smf": 0.60,
     "brk_price": 0.30, "brk_vol": 0.25, "brk_dryup": 0.20, "brk_base": 0.15, "brk_closing_strength": 0.10,
     "composite_1d": 0.25, "composite_5d": 0.45, "composite_20d": 0.30,
     "ma_ma20": 0.35, "ma_ma50": 0.30, "ma_slope": 0.35,
@@ -61,12 +80,22 @@ def cal_gtgd20(close: list[float], volume: list[float]) -> float:
 def cal_avg_volume_20d(volume: list[float]) -> float:
     return sum(volume[-21:-1]) / 20
 
+def cal_avg_volume_20d_excl_5(volume: list[float]) -> float:
+    """20-session average volume excluding the 5 most recent sessions (T-25..T-6).
+
+    Used as the dry-up denominator so the window does not overlap with the
+    4-session pre-volume average (T-4..T-1).
+    """
+    return sum(volume[-26:-6]) / 20
+
 def cal_intraday_gtgd(intraday: list[dict]) -> float:
-    # price is in thousands VND (vnstock_data convention), multiply by 1000 to get VND
-    return sum(t["price"] * 1000 * t["volume"] for t in intraday)
+    # price is in thousands VND (vnstock_data convention), multiply by 1000 to get VND.
+    # Spec §3.3.2: exclude ATO ticks (time < 09:15).
+    return sum(t["price"] * 1000 * t["volume"] for t in intraday if _is_continuous_tick(t))
 
 def cal_intraday_volume(intraday: list[dict]) -> float:
-    return sum(t["volume"] for t in intraday)
+    # Spec §3.3.2: exclude ATO ticks (time < 09:15).
+    return sum(t["volume"] for t in intraday if _is_continuous_tick(t))
 
 def cal_intraday_ratio(gtgd_intraday: float, gtgd20: float, minutes_elapsed: float) -> float:
     gtgd_expected = gtgd20 * (minutes_elapsed / 225)
@@ -108,10 +137,13 @@ def cal_buy_score(
     vnindex_history: list[dict], # get_vnindex_history() — same shape as history
     minutes_elapsed: float,      # trading minutes elapsed today (caller computes)
     position_size: float = 50_000_000,  # max VND per position (for safety ratio)
-    foreign_buy_vals: list[float] | None = None,   # buy_val per session, newest first
+    foreign_buy_vals: list[float] | None = None,   # buy_val per session, newest first (legacy)
     foreign_sell_vals: list[float] | None = None,
     prop_buy_vals: list[float] | None = None,
     prop_sell_vals: list[float] | None = None,
+    flow_data: dict | None = None,  # Preferred: pre-aggregated net flow from get_market_flow().
+                                    # Shape: {foreign_net_1d, foreign_net_10d, prop_net_*,
+                                    #         active_net_*}.
 ) -> BuyScoreBreakdown:
     """
     Compute Layer 2 BUY score from raw market data.
@@ -194,11 +226,34 @@ def cal_buy_score(
     ad_val    = cal_ad_ratio(close_arr[-21:], vol_arr[-21:])
     s_ad      = ad_score(ad_val)
 
-    # Smart Money Flow
-    if (foreign_buy_vals and foreign_sell_vals and len(foreign_buy_vals) >= 5
+    # Smart Money Flow — prefer the new market-wide net dict (Insights().flow.*)
+    # which gives pre-aggregated 10-day net values; fall back to the legacy
+    # 5-day buy/sell pair calculation for backwards compat.
+    gtgd_daily = cal_gtgd_daily(close_arr, vol_arr)
+    a_pct = None
+    s_active = None
+
+    if flow_data is not None:
+        # Denominator: GTGD over the last 10 completed sessions (excludes today).
+        gtgd_10d = sum(gtgd_daily[-11:-1])
+        f_net = flow_data.get("foreign_net_10d")
+        p_net = flow_data.get("prop_net_10d")
+        a_net = flow_data.get("active_net_10d")
+        f_pct = cal_net_pct(f_net, gtgd_10d) if f_net is not None else None
+        p_pct = cal_net_pct(p_net, gtgd_10d) if p_net is not None else None
+        a_pct = cal_net_pct(a_net, gtgd_10d) if a_net is not None else None
+
+        s_f = foreign_net_score(f_pct) if f_pct is not None else 40
+        s_p = prop_net_score(p_pct) if p_pct is not None else 40
+        if a_pct is not None:
+            s_active = active_net_score(a_pct)
+            s_smart_money = cal_smart_money_score_3c(s_f, s_p, s_active)
+        else:
+            s_smart_money = cal_smart_money_score(s_f, s_p)
+    elif (foreign_buy_vals and foreign_sell_vals and len(foreign_buy_vals) >= 5
             and prop_buy_vals and prop_sell_vals and len(prop_buy_vals) >= 5):
-        gtgd_daily = cal_gtgd_daily(close_arr, vol_arr)
-        gtgd_5d = sum(gtgd_daily[-6:-1])  # last 5 sessions excluding today
+        # Legacy path: per-symbol buy/sell pairs over 5 sessions.
+        gtgd_5d = sum(gtgd_daily[-6:-1])
         f_pct = cal_foreign_net_pct(foreign_buy_vals, foreign_sell_vals, gtgd_5d)
         p_pct = cal_prop_net_pct(prop_buy_vals, prop_sell_vals, gtgd_5d)
         s_smart_money = cal_smart_money_score(foreign_net_score(f_pct), prop_net_score(p_pct))
@@ -206,13 +261,22 @@ def cal_buy_score(
         f_pct = p_pct = None
         s_smart_money = 40  # neutral when data unavailable
 
-    rsi_val   = cal_rsi(close_arr)
+    s_flow, flow_base_val, convergence_mult_val = cal_score_flow(s_ad, s_smart_money)
+
+    # RSI uses the live last tick price as today's close (docs/filter.md §3.2.5.1).
+    # MACD and every other formula continue to use the EOD close.
+    close_for_rsi = close_arr
+    if intraday:
+        last_tick_price = intraday[-1].get("price")
+        if last_tick_price:
+            close_for_rsi = close_arr[:-1] + [last_tick_price]
+    rsi_val   = cal_rsi(close_for_rsi)
     macd_val  = cal_macd_histogram(close_arr, close_today)
     s_rsi     = score_rsi(rsi_val)
     s_macd    = score_macd_histogram(macd_val)
     s_tech    = technical_confirmation_score(rsi_val, macd_val)
 
-    s_momentum = momentum_score(s_volatility, s_ma, s_rs, s_ad, s_smart_money, s_tech)
+    s_momentum = momentum_score(s_volatility, s_ma, s_rs, s_flow, s_tech)
 
     mom_breakdown = {
         "composite_return": {
@@ -243,8 +307,24 @@ def cal_buy_score(
                 "accel_mult": rs_accel_mult_val,
             },
         },
-        "ad": {"value": ad_val, "score": s_ad},
-        "smart_money": {"score": s_smart_money, "detail": {"foreign_net_pct": f_pct, "prop_net_pct": p_pct}},
+        "flow": {
+            "value": flow_base_val,
+            "score": round(s_flow, 2),
+            "detail": {
+                "score_ad": s_ad,
+                "ad_value": ad_val,
+                "score_smf": s_smart_money,
+                "foreign_net_pct": f_pct,
+                "prop_net_pct": p_pct,
+                "active_net_pct": a_pct,
+                "score_active": s_active,
+                "active_band": _flow_band(s_active) if s_active is not None else None,
+                "convergence_mult": convergence_mult_val,
+                "flow_base": flow_base_val,
+                "ad_band": _flow_band(s_ad),
+                "smf_band": _flow_band(s_smart_money),
+            },
+        },
         "technical": {
             "score": s_tech,
             "detail": {
@@ -255,13 +335,13 @@ def cal_buy_score(
     }
 
     # ── Breakout ─────────────────────────────────────────────────────────
-    high20_val     = cal_high_20_sessions(high_arr[-21:])
-    b_ratio        = cal_breakout_ratio(close_today, high20_val)
+    close20_val    = cal_close_20_sessions(close_arr[-21:])
+    b_ratio        = cal_breakout_ratio(close_today, close20_val)
     vol_ratio_val  = cal_volume_ratio(
         cal_intraday_volume(intraday),
         cal_volume_expected(avg_vol_20d, minutes_elapsed),
     )
-    dry_up_val     = cal_dry_up_ratio(cal_pre_vol_avg(vol_arr), avg_vol_20d)
+    dry_up_val     = cal_dry_up_ratio(cal_pre_vol_avg(vol_arr), cal_avg_volume_20d_excl_5(vol_arr))
     atr_5d_val     = cal_atr_n_days(high_arr, low_arr, 5, close_arr)
     narrowing_val  = cal_narrowing_ratio(
         atr_5d_val,
@@ -321,6 +401,8 @@ def cal_buy_score(
             "minutes_elapsed": minutes_elapsed,
             "n_sessions": len(history),
             "position_size": position_size,
+            # docs/filter.md §3.2.5.1: last close fed into RSI is live tick price
+            "close_for_rsi_last": close_for_rsi[-1],
         },
         "gtgd": {
             "gtgd_daily_21": gtgd_daily_all[-21:],
@@ -344,8 +426,9 @@ def cal_buy_score(
             "note": "all 20 sessions up => down_count=0 => ad_ratio=999 => score 100",
         },
         "smart_money": {
-            "data_available": smart_data_ok,
-            "granularity": "end_of_day",  # foreign/prop buy-sell VALUE is per-session (EOD), no intraday
+            "data_available": smart_data_ok or (flow_data is not None),
+            "source": "market_flow_10d" if flow_data is not None else "per_symbol_5d",
+            # legacy 5d-pair fields (None when using market-wide flow_data path)
             "foreign_buy_5d": foreign_buy_5d,
             "foreign_sell_5d": foreign_sell_5d,
             "foreign_net_5d": foreign_net_5d,
@@ -353,8 +436,13 @@ def cal_buy_score(
             "prop_sell_5d": prop_sell_5d,
             "prop_net_5d": prop_net_5d,
             "gtgd_5d": gtgd_5d_val,
+            # current-path percentages (computed against gtgd_5d OR gtgd_10d)
             "foreign_net_pct": f_pct,
             "prop_net_pct": p_pct,
+            "active_net_pct": a_pct,
+            # market-wide raw net values when present
+            "flow_data": flow_data,
+            "gtgd_10d": sum(gtgd_daily_all[-11:-1]) if flow_data is not None else None,
         },
     }
 
@@ -513,22 +601,19 @@ def cv_score(cv):
 
 # Diem dong luong
 """
-_Ý nghĩa: Phân biệt mã thanh khoản tốt nhưng đi ngang với mã đang tăng thật. Với lướt sóng, chỉ cần bắt được đà đang mạnh - không cần dự báo dài hạn._
-
 Điểm động lượng = 0.30 × Điểm biến động giá composite
                + 0.20 × Điểm phân tích MA
-               + 0.20 × Điểm sức mạnh tương đối (RS) ← học từ VCP
-               + 0.10 × Điểm tích lũy/phân phối (A/D) ← học từ CANSLIM
-               + 0.15 × Điểm Smart Money Flow
+               + 0.20 × Điểm sức mạnh tương đối (RS)
+               + 0.25 × score_flow (A/D + SMF + convergence)
                + 0.10 × Điểm xác nhận kỹ thuật (RSI+MACD)
 (Tổng = 1.05 → normalize nội bộ)
 """
-def momentum_score(price_volatility_score, ma_score, rs_score, ad_score, smart_money_score, technical_confirmation_score):
-    raw_weights = (0.30, 0.20, 0.20, 0.10, 0.15, 0.10)
+def momentum_score(price_volatility_score, ma_score, rs_score, flow_score, technical_confirmation_score):
+    raw_weights = (0.30, 0.20, 0.20, 0.25, 0.10)
     total = sum(raw_weights)
     w = [x / total for x in raw_weights]
     return (w[0] * price_volatility_score + w[1] * ma_score + w[2] * rs_score
-            + w[3] * ad_score + w[4] * smart_money_score + w[5] * technical_confirmation_score)
+            + w[3] * flow_score + w[4] * technical_confirmation_score)
 
 # Diem bien dong gia composite
 """
@@ -804,22 +889,28 @@ def score_rsi(rsi):
     # Non-monotonic: sweet spot 60-70 for T+2.5 swing (strong but room to run)
     if rsi < 40:
         return 0
-    elif 40 <= rsi < 50:
-        return 20
-    elif 50 <= rsi < 60:
+    elif rsi < 45:
+        return 10
+    elif rsi < 50:
+        return 35
+    elif rsi < 60:
         return 60
-    elif 60 <= rsi < 70:
+    elif rsi < 70:
         return 100
-    elif 70 <= rsi < 80:
+    elif rsi < 80:
         return 60
     else:
         return 20
 
 def score_macd_histogram(histogram_pct):
-    if histogram_pct < 0:
+    if histogram_pct < -0.10:
+        return 0
+    elif histogram_pct < 0:
         return 20
-    elif 0 <= histogram_pct < 0.05:
+    elif histogram_pct < 0.05:
         return 50
+    elif histogram_pct < 0.20:
+        return 75
     else:
         return 100
 
@@ -851,8 +942,8 @@ def breakout_score(price_breakout_score, volume_confirmation_score, volume_dryup
 
 # Diem vuot can gia
 """
-High20 = max(high, 20_sessions)  # không tính hôm nay
-breakout_ratio = close_today / High20
+Close20 = max(close, 20_sessions)  # không tính hôm nay
+breakout_ratio = close_today / Close20
 
 | **Breakout ratio** | **Điểm**          |
 | ------------------ | ----------------- |
@@ -861,11 +952,11 @@ breakout_ratio = close_today / High20
 | 1.01-1.02          | 70                |
 | > 1.02             | 100               |
 """
-def cal_high_20_sessions(high):
-    return max(high[:-1])  # Không tính hôm nay
+def cal_close_20_sessions(close):
+    return max(close[:-1])  # Không tính hôm nay
 
-def cal_breakout_ratio(close_today, high_20_sessions):
-    return close_today / high_20_sessions
+def cal_breakout_ratio(close_today, close_20_sessions):
+    return close_today / close_20_sessions
 
 def price_breakout_score(breakout_ratio):
     if breakout_ratio < 1.0:
@@ -900,10 +991,10 @@ def cal_volume_ratio(volume_intraday, volume_expected):
 
 def volume_confirmation_score(volume_ratio):
     if volume_ratio < 1.0:
-        return 20
-    elif 1.0 <= volume_ratio < 1.3:
+        return 0
+    elif volume_ratio < 1.3:
         return 50
-    elif 1.3 <= volume_ratio < 1.8:
+    elif volume_ratio < 1.8:
         return 80
     else:
         return 100
@@ -959,10 +1050,17 @@ narrowing_ratio = atr_5d / atr_20d
 | 0.9-1.1             | 40       | Biên độ ổn định, không co lại               |
 | > 1.1              | 20       | Biên độ mở rộng - nền loạn, breakout rủi ro |
 """
-def cal_atr_n_days(high, low, n, close=None):
-    # True Range = max(H-L, |H-prev_C|, |L-prev_C|) when close provided
+def cal_atr_n_days(high, low, n, close=None, exclude_today: bool = True):
+    """Average True Range over the last n completed sessions (excludes today by default).
+
+    True Range = max(H-L, |H-prev_C|, |L-prev_C|) when close is provided,
+    else just H-L. Spec (docs/filter.md §3.3.4, §3.3.6): the 5d/20d ATRs
+    used by base quality and risk_ratio must NOT include today.
+    """
+    end = -1 if exclude_today else 0
+    start = end - n
     trs = []
-    for i in range(-n, 0):
+    for i in range(start, end):
         hl = high[i] - low[i]
         if close is not None:
             prev_c = close[i - 1]
@@ -1130,4 +1228,100 @@ def prop_net_score(pct: float) -> int:
     else:           return 0
 
 def cal_smart_money_score(f_score: int, p_score: int) -> float:
+    """Legacy 2-component SMF (foreign + prop). Used when active flow data
+    is unavailable. Weights: 0.60 foreign + 0.40 prop."""
     return 0.60 * f_score + 0.40 * p_score
+
+
+# ---------------------------------------------------------------------------
+# Smart Money Flow — 3-component (Foreign + Prop + Active)
+# Spec §3.2.5 — vnstock_data >= 3.2.0 (Insights().flow.{foreign,proprietary,active})
+# ---------------------------------------------------------------------------
+"""
+The new market-wide flow APIs return pre-aggregated NET values over 10
+trading sessions (value_10d). We divide by GTGD_10d to express the
+inflow/outflow as a percentage of total trading value.
+
+Active flow (dòng tiền chủ động) captures aggressive buy/sell orders
+across the whole market; magnitudes tend to be larger than foreign or
+prop, so the band table is wider:
+
+| Active net % (10d)  | Điểm |
+| ------------------- | ---- |
+| > +10%              | 100  |
+| +4% đến +10%        | 80   |
+| +1% đến +4%         | 60   |
+| -1% đến +1%         | 40   |
+| -4% đến -1%         | 20   |
+| < -4%               | 0    |
+
+3-component composite weights: foreign 0.40 + prop 0.30 + active 0.30.
+Foreign keeps the largest share (institutional alpha is the strongest
+signal); prop and active get equal smaller shares.
+"""
+
+
+def cal_net_pct(net_value: float | None, gtgd_window: float) -> float | None:
+    """Generic helper: net buy/sell value as % of GTGD over the same window.
+
+    Returns None when either input is missing or the denominator is zero.
+    """
+    if net_value is None or gtgd_window == 0:
+        return None
+    return net_value / gtgd_window * 100
+
+
+def active_net_score(pct: float) -> int:
+    if pct > 10:    return 100
+    elif pct > 4:   return 80
+    elif pct > 1:   return 60
+    elif pct > -1:  return 40
+    elif pct > -4:  return 20
+    else:           return 0
+
+
+def cal_smart_money_score_3c(f_score: int, p_score: int, a_score: int) -> float:
+    """3-component SMF: 0.40 foreign + 0.30 prop + 0.30 active."""
+    return 0.40 * f_score + 0.30 * p_score + 0.30 * a_score
+
+
+# ---------------------------------------------------------------------------
+# Score Flow (A/D + SMF + Convergence Multiplier) — spec §3.2.4
+# ---------------------------------------------------------------------------
+"""
+flow_base = 0.40 × score_AD + 0.60 × score_SMF
+score_flow = min(100, flow_base × convergence_mult)
+
+Convergence multiplier is a 3×3 lookup over (A/D band, SMF band) where the
+bands are: LOW ≤39, MID 40-69, HIGH ≥70.
+"""
+
+def _flow_band(score: float) -> str:
+    if score <= 39:
+        return "LOW"
+    if score <= 69:
+        return "MID"
+    return "HIGH"
+
+
+_CONVERGENCE_TABLE = {
+    ("HIGH", "HIGH"): 1.20, ("MID", "HIGH"): 1.10, ("LOW", "HIGH"): 0.90,
+    ("HIGH", "MID"):  1.05, ("MID", "MID"):  1.00, ("LOW", "MID"):  0.92,
+    ("HIGH", "LOW"):  0.85, ("MID", "LOW"):  0.90, ("LOW", "LOW"):  0.70,
+}
+
+
+def cal_convergence_mult(ad_score_val: float, smf_score_val: float) -> float:
+    return _CONVERGENCE_TABLE[(_flow_band(ad_score_val), _flow_band(smf_score_val))]
+
+
+def cal_score_flow(
+    ad_score_val: float,
+    smf_score_val: float,
+    w_ad: float = 0.40,
+    w_smf: float = 0.60,
+) -> tuple[float, float, float]:
+    """Return (score_flow, flow_base, convergence_mult)."""
+    flow_base = w_ad * ad_score_val + w_smf * smf_score_val
+    mult = cal_convergence_mult(ad_score_val, smf_score_val)
+    return min(100.0, flow_base * mult), flow_base, mult

@@ -69,12 +69,27 @@ export interface LiquidityBreakdown {
   cv: MetricCell;
 }
 
+export interface FlowDetail {
+  score_ad: number;
+  ad_value: number;
+  score_smf: number;
+  foreign_net_pct: number | null;
+  prop_net_pct: number | null;
+  // 3-component SMF — only populated when vnstock_data >= 3.2.0 active flow is available.
+  score_active?: number | null;
+  active_net_pct?: number | null;
+  active_band?: "LOW" | "MID" | "HIGH" | null;
+  convergence_mult: number;
+  flow_base: number;
+  ad_band: "LOW" | "MID" | "HIGH";
+  smf_band: "LOW" | "MID" | "HIGH";
+}
+
 export interface MomentumBreakdown {
   composite_return: MetricCell;
   ma: MetricCell;
   rs: MetricCell;
-  ad: MetricCell;
-  smart_money?: MetricCell;
+  flow: MetricCell;        // detail: FlowDetail
   technical: MetricCell;
 }
 

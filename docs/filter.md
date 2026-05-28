@@ -1,48 +1,46 @@
 Contents
 
-[1 Ngữ cảnh thiết kế 3](#_Toc230101552)
+[1 Ngữ cảnh thiết kế 2](#_Toc230811227)
 
-[2 Layer 1: Hard Filter 4](#_Toc230101553)
+[2 Layer 1: Hard Filter 3](#_Toc230811228)
 
-[3 Layer 2: BUY Scoring 6](#_Toc230101554)
+[3 Layer 2: BUY Scoring 5](#_Toc230811229)
 
-[3.1 Điểm Thanh khoản (0-100) 6](#_Toc230101555)
+[3.1 Điểm Thanh khoản (0-100) 5](#_Toc230811230)
 
-[3.1.1 Điểm GTGD20 6](#_Toc230101556)
+[3.1.1 Điểm GTGD20 5](#_Toc230811231)
 
-[3.1.2 Điểm hoạt động intraday 7](#_Toc230101557)
+[3.1.2 Điểm hoạt động intraday 6](#_Toc230811232)
 
-[3.1.3 Điểm ổn định thanh khoản - CV 8](#_Toc230101558)
+[3.1.3 Điểm ổn định thanh khoản - CV 7](#_Toc230811233)
 
-[3.2 Điểm Động lượng (0-100) 8](#_Toc230101559)
+[3.2 Điểm Động lượng (0-100) 7](#_Toc230811234)
 
-[3.2.1 Điểm biến động giá đa khung (trọng số 0.3) 9](#_Toc230101560)
+[3.2.1 Điểm biến động giá đa khung (trọng số 0.3) 8](#_Toc230811235)
 
-[3.2.2 Điểm phân tích MA 9](#_Toc230101561)
+[3.2.2 Điểm phân tích MA 11](#_Toc230811236)
 
-[3.2.3 Điểm sức mạnh tương đối vs VN-Index 11](#_Toc230101562)
+[3.2.3 Điểm sức mạnh tương đối vs VN-Index 16](#_Toc230811237)
 
-[3.2.4 Điểm tích lũy/phân phối (A/D Ratio) 12](#_Toc230101563)
+[3.2.4 Điểm dòng tiền (score_flow) 18](#_Toc230811238)
 
-[3.2.5 Điểm Smart Money Flow 13](#_Toc230101564)
+[3.2.5 Điểm xác nhận kỹ thuật score_technical (RSI + MACD) 22](#_Toc230811239)
 
-[3.2.6 Điểm xác nhận kỹ thuật score_technical (RSI + MACD) 14](#_Toc230101565)
+[3.3 Điểm Breakout (0.35) 23](#_Toc230811240)
 
-[3.3 Điểm Breakout (0.35) 15](#_Toc230101566)
+[3.3.1 Điểm vượt cản giá 23](#_Toc230811241)
 
-[3.3.1 Điểm vượt cản giá 15](#_Toc230101567)
+[3.3.2 Điểm xác nhận volume breakout 24](#_Toc230811242)
 
-[3.3.2 Điểm xác nhận volume breakout 15](#_Toc230101568)
+[3.3.3 Điểm volume dry-up trước breakout 25](#_Toc230811243)
 
-[3.3.3 Điểm volume dry-up trước breakout 16](#_Toc230101569)
+[3.3.4 Điểm chất lượng nền giá (Base Quality) 25](#_Toc230811244)
 
-[3.3.4 Điểm chất lượng nền giá (Base Quality) 16](#_Toc230101570)
+[3.3.5 Điểm sức mạnh đóng cửa (closing_strength) 26](#_Toc230811245)
 
-[3.3.5 Điểm sức mạnh đóng cửa (closing_strength) 17](#_Toc230101571)
+[3.3.6 Hệ số đánh giá rủi ro bị khóa T+2.5 (risk_ratio) 27](#_Toc230811246)
 
-[3.3.6 Hệ số đánh giá rủi ro bị khóa T+2.5 (risk_ratio) 18](#_Toc230101572)
-
-[3.4 Tần suất chạy các tham số 19](#_Toc230101573)
+[3.4 Tần suất chạy các tham số 28](#_Toc230811247)
 
 # Ngữ cảnh thiết kế
 
@@ -198,9 +196,7 @@ _Ý nghĩa: Phân biệt mã thanh khoản tốt nhưng đi ngang với mã đan
 
 \+ 0.20 × Điểm sức mạnh tương đối (RS) ← học từ VCP
 
-\+ 0.1 × Điểm tích lũy/phân phối (A/D) ← học từ CANSLIM
-
-\+ 0.15 × Smart Money Flow
+\+ 0.25 × score_flow
 
 \+ 0.1 × Điểm xác nhận kỹ thuật (RSI+MACD)
 
@@ -491,6 +487,12 @@ _\# Ưu tiên 3 tháng gần nhất cho lướt sóng (VCP dùng 12 tháng cho s
 | −5% → 0%          | × 0.90         | RS đang chậm lại - cảnh báo                     |
 | < −5%             | **× 0.80**     | Ex-leader - RS mất sức rõ ràng                  |
 
+### Điểm dòng tiền (score_flow)
+
+flow_base = 0.40 × score_AD (tính ở 3.2.4.1) + 0.60 × score_SMF (tính ở 3.2.4.2)
+
+score_flow = min(100, flow_base × convergence_mult (tính ở 3.2.4.3)
+
 #### Điểm tích lũy/phân phối (A/D Ratio)
 
 _Tham khảo từ: CANSLIM - S component (Supply & Demand, 15% weight). CANSLIM S component phát hiện smart money đang mua hay bán. Nếu volume ngày tăng giá > volume ngày giảm giá → tổ chức đang tích lũy → momentum có nền tảng. Đây là tín hiệu SỚM hơn breakout, giúp phân biệt breakout có dòng tiền thật hay không._
@@ -512,11 +514,11 @@ ad_ratio = mean(up_days_vol) / mean(down_days_vol)
 | < 0.7         | 20       | Phân phối rõ (smart money ra)                                 |
 | ∞             | 100      | Cả 20 phiên tăng giá -> mean(down_days_vol) = 0 → chia cho 0. |
 
-### Điểm Smart Money Flow
+#### Điểm Smart Money Flow
 
 **\# --- Net Foreign Flow --- (Khối ngoại)**
 
-foreign_net_5d = sum(foreign_buy_value - foreign_sell_value, 5_phiên) # VND
+foreign_net_5d = sum(foreign_buy_value - foreign_sell_value, 5_phiên gần nhất không có hôm nay do không có api get smart flow realtime) # VND
 
 foreign_buy_value: khối ngoại mua bao nhiêu tiền trong ngày
 
@@ -558,36 +560,55 @@ Lưu ý: Ngưỡng proprietary thấp hơn foreign vì tự doanh thường giao
 
 smart_money_score = 0.60 × score(foreign_net_pct) + 0.40 × score(prop_net_pct)
 
-> **Lưu ý về dữ liệu (granularity):** Giá trị mua/bán (buy/sell **value**) của khối ngoại và tự doanh từ `vnstock_data` chỉ có ở mức **cuối phiên (end-of-day, per-session)** — không có dữ liệu intraday/realtime. `intraday()` chỉ trả `time/price/volume`; `price_board()` realtime chỉ có foreign buy/sell **volume** (không có value, không có tự doanh). Do đó component Smart Money Flow **không cập nhật trong phiên**: dù app refresh 5 phút/lần, giá trị này giữ nguyên theo phiên T-1 cho tới khi phiên mới chốt.
+#### Convergence Multiplier
+
+| **A/D Ratio** | **SMF Score** | **Multiplier** | **Diễn giải**                 | **Kịch bản điển hình**                                                                                                                                            |
+| ------------- | ------------- | -------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **HIGH ≥70**  | **HIGH ≥70**  | **× 1.20**     | **Xác nhận mạnh nhất**        | Giá tăng volume lớn + foreign mua ròng mạnh → hai nguồn cùng xác nhận tích lũy thật                                                                               |
+| MID 40-69     | **HIGH ≥70**  | **× 1.10**     | **SMF dẫn trước**             | Foreign mua ròng mạnh nhưng A/D chưa rõ → tổ chức đang vào trước price action phản ánh. Tín hiệu sớm.                                                             |
+| **HIGH ≥70**  | MID 40-69     | × 1.05         | A/D dẫn, SMF theo sau         | Price-volume tích lũy tốt nhưng foreign/prop chưa rõ hướng → có thể retail đang tích lũy, hoặc tổ chức chưa đủ lớn để thấy trong SMF                              |
+| MID 40-69     | MID 40-69     | × 1.00         | Trung tính                    | Không có signal rõ từ cả hai nguồn → giữ nguyên điểm                                                                                                              |
+| **LOW ≤39**   | **HIGH ≥70**  | × 0.90         | _Mâu thuẫn - SMF mua vào yếu_ | Foreign mua ròng nhưng volume ngày giảm > volume ngày tăng → tổ chức đang mua vào ngày giá yếu (accumulation on weakness). Tín hiệu chưa rõ, không penalize mạnh. |
+| **HIGH ≥70**  | **LOW ≤39**   | × 0.85         | Mâu thuẫn nguy hiểm hơn       | A/D đẹp nhưng foreign/prop đang bán ròng → retail đang mua khi tổ chức đang phân phối. Pattern kinh điển của distribution. Penalty mạnh hơn LOW+HIGH.             |
+| MID 40-69     | **LOW ≤39**   | × 0.90         | Cảnh báo nhẹ                  | SMF tiêu cực nhưng A/D chưa phản ánh → cảnh báo sớm, chưa đủ để phạt mạnh                                                                                         |
+| **LOW ≤39**   | MID 40-69     | × 0.92         | Cảnh báo nhẹ                  | A/D xấu nhưng SMF chưa rõ hướng → tín hiệu yếu nhưng không mâu thuẫn                                                                                              |
+| **LOW ≤39**   | **LOW ≤39**   | **× 0.70**     | **Cảnh báo mạnh nhất**        | Volume ngày giảm >> tăng VÀ foreign/prop bán ròng → hai nguồn xác nhận phân phối. Tránh tuyệt đối.                                                                |
 
 ### Điểm xác nhận kỹ thuật score_technical (RSI + MACD)
 
-#### RSI 14 phiên
+#### RSI 14 phiên (score_RSI)
 
-| **RSI (14 phiên)** | **Điểm** | **Ghi chú**                                           |
-| ------------------ | -------- | ----------------------------------------------------- |
-| < 40               | 0        | Quá yếu                                               |
-| 40-50              | 20       | Yếu                                                   |
-| 50-60              | 60       | Momentum đang xây                                     |
-| **60-70**          | **100**  | **Sweet spot cho swing - mạnh nhưng còn room tăng**   |
-| 70-80              | 60       | Rủi ro mean-reversion trong 2.5 phiên                 |
-| \> 80              | 20       | Nguy hiểm - khả năng đảo chiều trước khi bạn bán được |
+| **RSI (14 phiên)** | **Điểm** | **Ghi chú**                        |
+| ------------------ | -------- | ---------------------------------- |
+| < 40               | **0**    | Quá yếu - momentum tiêu cực rõ     |
+| 40 → 45            | **10**   | Buffer zone dưới                   |
+| 45 → 50            | 35       | Yếu, đang chuyển tiếp              |
+| 50 → 60            | 60       | Momentum đang xây dựng             |
+| 60 → 70            | **100**  | Sweet spot - mạnh nhưng còn room   |
+| 70 → 80            | 60       | Cảnh báo overbought - T+2.5 risk   |
+| \> 80              | **20**   | Overbought rõ - khả năng đảo chiều |
 
 _(Logic: Với T+2.5, điểm tối ưu là momentum đang tăng nhưng chưa quá nóng - RSI 60-70 cho xác suất tiếp tục tốt nhất trong 3-5 phiên tiếp theo.)_
 
-#### MACD - chuẩn hóa theo giá
+RSI (14) trong công thức này là tính theo ngày. Riêng today thì lấy giá đóng cửa live hiện thời.
+
+close\[T-15\] close\[T-14\], close\[T-13\], ... close\[T-1\], close_today_live
+
+#### MACD - chuẩn hóa theo giá (histogram_pct)
 
 histogram = macd_line - signal_line
 
 histogram_pct = histogram / close_today × 100
 
-| **Histogram%** | **Điểm** |
-| -------------- | -------- |
-| < 0%           | 20       |
-| 0-0.05%        | 50       |
-| \> 0.05%       | 100      |
+| **histogram_pct** | **Điểm** | **Ý nghĩa**                                    |
+| ----------------- | -------- | ---------------------------------------------- |
+| < −0.10%          | **0**    | Bearish rõ - signal line vượt MACD line rõ rệt |
+| −0.10% → 0%       | **20**   | Nhẹ âm - momentum tiêu cực chưa rõ             |
+| 0% → 0.05%        | 50       | Vừa chuyển dương - crossover mới               |
+| 0.05% → 0.20%     | **75**   | Dương rõ - momentum tích cực                   |
+| \> 0.20%          | **100**  | Dương mạnh - momentum xác nhận rõ ràng         |
 
-**score_technical = 0.60 × score(RSI) + 0.40 × score(MACD)**
+**score_technical = 0.60 × score(RSI) + 0.40 × histogram_pct**
 
 ## Điểm Breakout (0.35)
 
@@ -613,9 +634,9 @@ _Lý do: Các sub-component còn lại (volume dry-up, base quality, holding) đ
 
 ### Điểm vượt cản giá
 
-High20 = max(high, 20_sessions) # không tính hôm nay
+Close20 = max(close, 20 phiên) # không tính hôm nay
 
-breakout_ratio = close_today / High20
+breakout_ratio = close_today / Close20
 
 | **Breakout ratio** | **Điểm**          |
 | ------------------ | ----------------- |
@@ -632,9 +653,17 @@ volume_expected = avg_volume_20d × (minutes_elapsed / 225)
 
 volume_ratio = volume_intraday / volume_expected
 
+| **Biến**            | **Định nghĩa**                                                                                               | **Ghi chú**                                  |
+| ------------------- | ------------------------------------------------------------------------------------------------------------ | -------------------------------------------- |
+| **avg_volume_20d**  | Trung bình số cổ phiếu khớp 20 ngày vừa qua - **đơn vị: số cổ phiếu**, không phải VND, không bao gồm hôm nay | _Làm rõ đơn vị - tránh nhầm với GTGD_        |
+| **volume_intraday** | Tổng cổ phiếu khớp từ **9:15 đến hiện tại** - không bao gồm ATO                                              | _Làm rõ: loại ATO ra để tránh inflate ratio_ |
+| **minutes_elapsed** | Số phút từ **9:15** đến thời điểm hiện tại                                                                   |                                              |
+| **volume_expected** | avg_volume_20d × (minutes_elapsed / 225)                                                                     |                                              |
+| **volume_ratio**    | volume_intraday / volume_expected                                                                            |                                              |
+
 | **Volume ratio** | **Điểm** |
 | ---------------- | -------- |
-| < 1.0            | 20       |
+| < 1.0            | 0        |
 | 1.0-1.3          | 50       |
 | 1.3-1.8          | 80       |
 | \> 1.8           | 100      |
@@ -647,7 +676,11 @@ _Lý do bổ sung: VCP phát hiện điều ngược lại với intuition: volu
 
 \# Volume trung bình 4 phiên trước hôm nay (loại hôm nay vì đang breakout)
 
-pre_vol_avg = mean(volume\[-5:-1\]) # 4 phiên gần nhất trước T0
+pre_vol_avg = mean(volume\[T-5:T-1\]) # 4 phiên gần nhất trước T0
+
+dry_up_ratio = pre_vol_avg / avg_volume_20d
+
+trong đó avg_volume_20d = mean(volume, T-6 đến T-25) # 20 phiên, loại 5 phiên gần nhất
 
 dry_up_ratio = pre_vol_avg / avg_volume_20d
 
@@ -667,11 +700,19 @@ _Học từ: VCP - Contraction Quality component (25% weight trong VCP)_
 
 _Lý do bổ sung: VCP yêu cầu nền giá phải ngày càng thu hẹp (volatility contraction) trước breakout. Breakout từ nền loạn (biên độ cao, không ổn định) dễ là fake breakout hơn nhiều. Với lướt sóng, nền giá chặt = điểm vào rõ ràng, stop-loss gần = risk/reward tốt hơn._
 
-\# ATR (Average True Range) đơn giản = High - Low
+\# ATR (Average True Range)
 
-atr_5d = mean(high\[-5:\] - low\[-5:\]) # biên độ trung bình 5 phiên gần nhất
+True Range (1 phiên) = max trong 3 giá trị sau:
 
-atr_20d = mean(high\[-20:\] - low\[-20:\]) # biên độ trung bình 20 phiên
+1\. high - low (biên độ trong phiên)
+
+2\. |high - close_hôm_trước| (gap lên)
+
+3\. |low - close_hôm_trước| (gap xuống)
+
+atr_5d = mean(True Range, 5 phiên gần nhất)# (không bao gồm hôm nay)
+
+atr_20d = mean(True Range, 20 phiên gần nhất)# (không bao gồm hôm nay)
 
 narrowing_ratio = atr_5d / atr_20d
 
@@ -687,14 +728,6 @@ narrowing_ratio = atr_5d / atr_20d
 
 ### Điểm sức mạnh đóng cửa (closing_strength)
 
-|     |     |
-| --- | --- |
-|     |     |
-|     |     |
-|     |     |
-|     |     |
-|     |     |
-
 **closing_strength = (close - low) / (high - low) × 100**
 
 | Closing strength | Điểm | Ý nghĩa                                             |
@@ -706,6 +739,8 @@ narrowing_ratio = atr_5d / atr_20d
 | < 20%            | 20   | Đóng cửa gần low - sellers kiểm soát cuối phiên     |
 
 _(Lý do: Closing strength phản ánh ai kiểm soát cuối phiên - dự báo tốt hơn cho gap mở cửa ngày mai và xu hướng các phiên tiếp theo. Data chỉ cần OHLC (đã có sẵn).)_
+
+_Edge case: Nếu high=low -> chia cho 0 -> chọn closing_strength=50_
 
 ### Hệ số đánh giá rủi ro bị khóa T+2.5 (risk_ratio)
 
@@ -723,7 +758,7 @@ True Range (1 phiên) = max trong 3 giá trị sau:
 
 3\. |low - close_hôm_trước| (gap xuống)
 
-ATR_5d = mean(True Range, 5 phiên gần nhất)
+ATR_5d = mean(True Range, 5 phiên gần nhất) (không bao gồm ngày hôm nay)
 
 | Risk ratio | Hệ số  | Ý nghĩa                                  |
 | ---------- | ------ | ---------------------------------------- |
