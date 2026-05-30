@@ -30,3 +30,4 @@ class SmartMoneyFlowResponse(BaseModel):
     days_requested: int
     fetched_at: str
     rows: list[SmartMoneyFlowRow]
+    warning: str | None = None

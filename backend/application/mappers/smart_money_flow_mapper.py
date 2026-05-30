@@ -112,4 +112,5 @@ class SmartMoneyFlowMapper:
             days_requested=series.days_requested,
             fetched_at=fetched_at,
             rows=out_rows,
+            warning=series.warning,
         )

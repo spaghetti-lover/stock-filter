@@ -172,7 +172,7 @@ def get_market_flow(exchange: str) -> dict[str, dict]:
     return out
 
 
-def get_smart_money_raw(symbol: str, days: int) -> list[dict]:
+def get_smart_money_raw(symbol: str, days: int) -> tuple[list[dict], str | None]:
     """Per-day foreign + proprietary flow joined with OHLCV-derived GTGD/close.
 
     Calls Market.equity(symbol).foreign_flow / .proprietary_flow / .ohlcv
@@ -203,15 +203,17 @@ def get_smart_money_raw(symbol: str, days: int) -> list[dict]:
     _limiter.acquire()
     df_f = eq.foreign_flow(start=start, end=end)
     _limiter.acquire()
+    _warnings: list[str] = []
     try:
         df_p = eq.proprietary_flow(start=start, end=end)
     except AttributeError:
         # vnstock_data bug: some symbols return integer columns that fail .str accessor
         log.warning("proprietary_flow unavailable for %s (library bug), skipping", symbol)
         df_p = None
+        _warnings.append("Dữ liệu tự doanh (proprietary flow) không khả dụng cho mã này.")
 
     if df_ohlcv is None or len(df_ohlcv) == 0:
-        return []
+        return [], "Không có dữ liệu OHLCV cho mã này."
 
     o = df_ohlcv[["time", "close", "volume"]].copy()
     o["time"] = pd.to_datetime(o["time"]).dt.normalize()
@@ -220,8 +222,14 @@ def get_smart_money_raw(symbol: str, days: int) -> list[dict]:
     o["total_gtgd"] = o["close"].astype(float) * 1000.0 * o["volume"].astype(float)
 
     def _flow_frame(df, prefix: str) -> pd.DataFrame:
+        empty = pd.DataFrame(columns=["time", f"{prefix}_buy_value", f"{prefix}_sell_value"])
         if df is None or len(df) == 0:
-            return pd.DataFrame(columns=["time", f"{prefix}_buy_value", f"{prefix}_sell_value"])
+            return empty
+        if not {"time", "buy_val", "sell_val"}.issubset(df.columns):
+            log.warning("%s_flow missing expected columns; got %s", prefix, list(df.columns))
+            label = "nước ngoài" if prefix == "foreign" else "tự doanh"
+            _warnings.append(f"Dữ liệu {label} không đầy đủ cho mã này.")
+            return empty
         f = df[["time", "buy_val", "sell_val"]].copy()
         f["time"] = pd.to_datetime(f["time"]).dt.normalize()
         f = f.rename(columns={"buy_val": f"{prefix}_buy_value", "sell_val": f"{prefix}_sell_value"})
@@ -256,7 +264,7 @@ def get_smart_money_raw(symbol: str, days: int) -> list[dict]:
             "close_price": float(row["close"]),
         })
     log.info("smart_money_raw %s: %d rows", symbol, len(out))
-    return out
+    return out, " ".join(_warnings) if _warnings else None
 
 
 def _safe_float(v) -> float | None:

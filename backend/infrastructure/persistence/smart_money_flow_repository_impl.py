@@ -13,7 +13,7 @@ log = get_logger(__name__)
 class SmartMoneyFlowRepositoryImpl(SmartMoneyFlowRepository):
     async def get_flow(self, symbol: str, days: int) -> SmartMoneyFlowSeries:
         loop = asyncio.get_event_loop()
-        raw = await loop.run_in_executor(executor, get_smart_money_raw, symbol, days)
+        raw, warning = await loop.run_in_executor(executor, get_smart_money_raw, symbol, days)
         rows = [
             SmartMoneyFlowDay(
                 date=r["date"],
@@ -26,4 +26,4 @@ class SmartMoneyFlowRepositoryImpl(SmartMoneyFlowRepository):
             )
             for r in raw
         ]
-        return SmartMoneyFlowSeries(symbol=symbol, days_requested=days, rows=rows)
+        return SmartMoneyFlowSeries(symbol=symbol, days_requested=days, rows=rows, warning=warning)
