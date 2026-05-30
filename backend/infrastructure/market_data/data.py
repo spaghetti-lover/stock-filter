@@ -203,7 +203,12 @@ def get_smart_money_raw(symbol: str, days: int) -> list[dict]:
     _limiter.acquire()
     df_f = eq.foreign_flow(start=start, end=end)
     _limiter.acquire()
-    df_p = eq.proprietary_flow(start=start, end=end)
+    try:
+        df_p = eq.proprietary_flow(start=start, end=end)
+    except AttributeError:
+        # vnstock_data bug: some symbols return integer columns that fail .str accessor
+        log.warning("proprietary_flow unavailable for %s (library bug), skipping", symbol)
+        df_p = None
 
     if df_ohlcv is None or len(df_ohlcv) == 0:
         return []
