@@ -1,12 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import { normalize, type Weights } from "@/lib/scoring";
 import { fmtBillion, fmtPct, fmtRatio, fmtScore, fmtPrice } from "@/lib/format";
 import { Pill } from "@/components/ui/Pill";
 import { PillarGauge } from "./PillarGauge";
 import { TradingViewChart } from "./TradingViewChart";
+import { SmartMoneyChart } from "./smart-money/SmartMoneyChart";
 import type { Layer2Score } from "@/lib/types";
 import type { RecomputedScores } from "@/lib/scoring";
+
+type ChartType = "tradingview" | "smart-money";
 
 interface Props {
   stock: Layer2Score & { _scores?: RecomputedScores };
@@ -14,6 +18,7 @@ interface Props {
 }
 
 export function BreakdownPanel({ stock, weights }: Props) {
+  const [chartType, setChartType] = useState<ChartType>("tradingview");
   const bd = stock.breakdown;
   if (!bd) return null;
   const liq = bd.liquidity;
@@ -52,7 +57,22 @@ export function BreakdownPanel({ stock, weights }: Props) {
       </header>
 
       <div className="border-b border-[var(--color-line)] p-4">
-        <TradingViewChart symbol={stock.symbol} exchange={stock.exchange} />
+        <div className="mb-3 flex items-center justify-between">
+          <span className="tag">Chart</span>
+          <select
+            value={chartType}
+            onChange={(e) => setChartType(e.target.value as ChartType)}
+            className="border border-[var(--color-line)] bg-[var(--color-surface)] px-2 py-1 text-[11px] text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)]"
+          >
+            <option value="tradingview">TradingView</option>
+            <option value="smart-money">Smart Money Flow</option>
+          </select>
+        </div>
+        {chartType === "tradingview" ? (
+          <TradingViewChart symbol={stock.symbol} exchange={stock.exchange} />
+        ) : (
+          <SmartMoneyChart symbol={stock.symbol} />
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-px bg-[var(--color-line)] lg:grid-cols-3">

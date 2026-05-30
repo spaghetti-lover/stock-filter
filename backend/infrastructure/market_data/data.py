@@ -3,6 +3,7 @@ import threading
 from collections import deque
 from datetime import datetime, timedelta
 
+import pandas as pd
 from vnstock_data import Reference, Market, Insights
 from logger import get_logger
 
@@ -168,6 +169,88 @@ def get_market_flow(exchange: str) -> dict[str, dict]:
             "active_net_10d": _safe_float(a_10d[i]),
         }
     log.info("Fetched market_flow for %s: %d symbols", exchange, len(out))
+    return out
+
+
+def get_smart_money_raw(symbol: str, days: int) -> list[dict]:
+    """Per-day foreign + proprietary flow joined with OHLCV-derived GTGD/close.
+
+    Calls Market.equity(symbol).foreign_flow / .proprietary_flow / .ohlcv
+    over a window of [today - days*2 calendar days, today] to ensure enough
+    trading sessions are returned (vnstock returns trading days only, so the
+    calendar window is padded). The result is left-joined on ohlcv `time`
+    (the trading-day truth), oldest-first, with total_gtgd ≈ close × volume.
+
+    Sessions where total_gtgd is null or 0 are dropped (per chart spec §10).
+
+    Returns a list of dicts with keys:
+      date (YYYY-MM-DD), foreign_buy_value, foreign_sell_value,
+      prop_buy_value, prop_sell_value, total_gtgd, close_price.
+    Missing flow on a real trading day is filled with 0.
+    """
+    log.debug("Fetching smart_money_raw: symbol=%s days=%d", symbol, days)
+    # Pad the calendar window so we get at least `days` trading sessions back.
+    pad = max(int(days * 2), days + 30)
+    end_dt = datetime.now()
+    start_dt = end_dt - timedelta(days=pad)
+    end = end_dt.strftime("%Y-%m-%d")
+    start = start_dt.strftime("%Y-%m-%d")
+
+    eq = Market().equity(symbol)
+
+    _limiter.acquire()
+    df_ohlcv = eq.ohlcv(start=start, end=end)
+    _limiter.acquire()
+    df_f = eq.foreign_flow(start=start, end=end)
+    _limiter.acquire()
+    df_p = eq.proprietary_flow(start=start, end=end)
+
+    if df_ohlcv is None or len(df_ohlcv) == 0:
+        return []
+
+    o = df_ohlcv[["time", "close", "volume"]].copy()
+    o["time"] = pd.to_datetime(o["time"]).dt.normalize()
+    # vnstock `close` is in VND×1000 (price quote scale); `volume` is in shares;
+    # `foreign_flow.buy_val` is in VND. Normalize so total_gtgd is in VND.
+    o["total_gtgd"] = o["close"].astype(float) * 1000.0 * o["volume"].astype(float)
+
+    def _flow_frame(df, prefix: str) -> pd.DataFrame:
+        if df is None or len(df) == 0:
+            return pd.DataFrame(columns=["time", f"{prefix}_buy_value", f"{prefix}_sell_value"])
+        f = df[["time", "buy_val", "sell_val"]].copy()
+        f["time"] = pd.to_datetime(f["time"]).dt.normalize()
+        f = f.rename(columns={"buy_val": f"{prefix}_buy_value", "sell_val": f"{prefix}_sell_value"})
+        return f
+
+    ff = _flow_frame(df_f, "foreign")
+    pf = _flow_frame(df_p, "prop")
+
+    merged = o.merge(ff, on="time", how="left").merge(pf, on="time", how="left")
+    for col in ("foreign_buy_value", "foreign_sell_value", "prop_buy_value", "prop_sell_value"):
+        if col not in merged.columns:
+            merged[col] = 0.0
+        merged[col] = merged[col].fillna(0.0).astype(float)
+
+    # Drop sessions with no real GTGD (spec §10).
+    merged = merged[merged["total_gtgd"].notna() & (merged["total_gtgd"] > 0)]
+    merged = merged.sort_values("time", ascending=True).reset_index(drop=True)
+
+    out: list[dict] = []
+    # Take the last `days` trading sessions (oldest-first slice).
+    if len(merged) > days:
+        merged = merged.tail(days).reset_index(drop=True)
+
+    for _, row in merged.iterrows():
+        out.append({
+            "date": row["time"].strftime("%Y-%m-%d"),
+            "foreign_buy_value": float(row["foreign_buy_value"]),
+            "foreign_sell_value": float(row["foreign_sell_value"]),
+            "prop_buy_value": float(row["prop_buy_value"]),
+            "prop_sell_value": float(row["prop_sell_value"]),
+            "total_gtgd": float(row["total_gtgd"]),
+            "close_price": float(row["close"]),
+        })
+    log.info("smart_money_raw %s: %d rows", symbol, len(out))
     return out
 
 

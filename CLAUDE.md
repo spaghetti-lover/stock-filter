@@ -72,11 +72,13 @@ OPENAI_API_KEY=sk-proj-...
 DATABASE_URL=postgresql://postgres:password@localhost:5432/stock_data
 ```
 
-`vnstock_data` 3.0.0 (sponsored) is installed in the project `.venv`.
+`vnstock_data` 3.2.1 (sponsored) is installed in the project `.venv`.
 
 ## vnstock_data API Usage (this project)
 
-This project uses `vnstock_data` 3.0.0 (Unified UI), **not** the free `vnstock` library.
+This project uses `vnstock_data` 3.2.1 (Unified UI), **not** the free `vnstock` library.
+
+> Note: `show_api()` only prints the abbreviated top-level tree — many real methods (e.g. `Market.equity().ohlcv()`, `.foreign_flow()`, `.proprietary_flow()`) are hidden from that listing. Use `dir(Market().equity("VCB"))` to see the full surface.
 
 ### Import
 
@@ -86,11 +88,13 @@ from vnstock_data import Reference, Market
 
 ### API map for this project
 
-| Purpose                 | Call                                                                             |
-| ----------------------- | -------------------------------------------------------------------------------- |
-| List symbols (HOSE/HNX) | `Reference().equity.list_by_exchange()` → filter `exchange` in `["HOSE", "HNX"]` |
-| Daily OHLCV history     | `Market().equity(symbol).ohlcv(start="YYYY-MM-DD", end="YYYY-MM-DD")`            |
-| Intraday ticks          | `Market().equity(symbol).intraday()`                                             |
+| Purpose                 | Call                                                                                      |
+| ----------------------- | ----------------------------------------------------------------------------------------- |
+| List symbols (HOSE/HNX) | `Reference().equity.list_by_exchange()` → filter `exchange` in `["HOSE", "HNX"]`          |
+| Daily OHLCV history     | `Market().equity(symbol).ohlcv(start="YYYY-MM-DD", end="YYYY-MM-DD")`                     |
+| Intraday ticks          | `Market().equity(symbol).intraday()`                                                      |
+| Foreign daily flow      | `Market().equity(symbol).foreign_flow(start="YYYY-MM-DD", end="YYYY-MM-DD")`              |
+| Proprietary daily flow  | `Market().equity(symbol).proprietary_flow(start="YYYY-MM-DD", end="YYYY-MM-DD")`          |
 
 ### Column shapes
 
@@ -99,6 +103,8 @@ from vnstock_data import Reference, Market
 **`ohlcv()`** → `time` (datetime), `open`, `high`, `low`, `close`, `volume`
 
 **`intraday()`** → `time` (datetime), `price`, `volume`, `match_type`, `id`
+
+**`foreign_flow()` / `proprietary_flow()`** → `time` (datetime), `buy_vol`, `buy_val`, `sell_vol`, `sell_val`, `net_vol`, `net_val` (values in VND, newest-last)
 
 ### Intraday datetime quirk
 

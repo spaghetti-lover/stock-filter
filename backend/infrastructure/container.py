@@ -3,11 +3,13 @@ from application.services.discussion_crawl_service import DiscussionCrawlUseCase
 from application.use_case.ai_filter_use_case import AIFilterUseCase
 from application.use_case.layer1_use_case import Layer1UseCase
 from application.use_case.layer2_use_case import Layer2UseCase
+from application.use_case.smart_money_flow_use_case import SmartMoneyFlowUseCase
 from infrastructure.persistence.crawl_repository_impl import CrawlRepositoryImpl
 from infrastructure.persistence.discussion_repository_impl import DiscussionRepositoryImpl
 from infrastructure.persistence.layer1_stock_repository_db import Layer1StockRepositoryDB
 from infrastructure.persistence.layer1_stock_repository_impl import Layer1StockRepositoryImpl
 from infrastructure.persistence.layer2_score_repository_db import Layer2ScoreRepositoryDB
+from infrastructure.persistence.smart_money_flow_repository_impl import SmartMoneyFlowRepositoryImpl
 from infrastructure.persistence.stock_metrics import save_stocks_to_db
 from infrastructure.scrapers.f319 import F319Scraper
 
@@ -39,6 +41,10 @@ def get_crawl_usecase() -> CrawlUseCase:
 
 def get_layer2_usecase() -> Layer2UseCase:
     return Layer2UseCase(repo=Layer2ScoreRepositoryDB())
+
+
+def get_smart_money_flow_usecase() -> SmartMoneyFlowUseCase:
+    return SmartMoneyFlowUseCase(repo=SmartMoneyFlowRepositoryImpl())
 
 
 _discussion_usecase: DiscussionCrawlUseCase | None = None
