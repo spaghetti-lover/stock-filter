@@ -7,7 +7,7 @@ const NAV = [
   { href: "/layer1", label: "Layer 01", title: "Hard filters" },
   { href: "/layer2", label: "Layer 02", title: "BUY score" },
   { href: "/layer2/log", label: "Layer 02", title: "Log breakdown" },
-  { href: "/agent", label: "Agent", title: "Trading Agent" },
+  { href: "/agent", label: "Agent", title: "Trader Agent" },
   { href: "/chat", label: "Assistant", title: "Stock chat" },
 ];
 
