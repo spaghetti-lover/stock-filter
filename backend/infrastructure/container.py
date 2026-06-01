@@ -11,6 +11,7 @@ from infrastructure.persistence.layer1_stock_repository_impl import Layer1StockR
 from infrastructure.persistence.layer2_score_repository_db import Layer2ScoreRepositoryDB
 from infrastructure.persistence.smart_money_flow_repository_impl import SmartMoneyFlowRepositoryImpl
 from infrastructure.persistence.stock_metrics import save_stocks_to_db
+from infrastructure.scrapers.f247 import F247Scraper
 from infrastructure.scrapers.f319 import F319Scraper
 
 
@@ -54,7 +55,7 @@ def get_discussion_crawl_usecase() -> DiscussionCrawlUseCase:
     global _discussion_usecase
     if _discussion_usecase is None:
         repo = DiscussionRepositoryImpl()
-        scrapers = [F319Scraper()]
+        scrapers = [F319Scraper(), F247Scraper()]
         _discussion_usecase = DiscussionCrawlUseCase(repo, scrapers)
     return _discussion_usecase
 
