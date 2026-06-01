@@ -35,4 +35,26 @@ DEFAULT_CONFIG = {
     "max_debate_rounds": 1,
     "max_risk_discuss_rounds": 1,
     "max_recur_limit": 100,
+    # Risk module selector. "tradingagents" = legacy 3-debator LLM chain
+    # (unchanged default). "tradinggroup" = single deterministic quant node
+    # that computes vol-scaled stop-loss / take-profit thresholds and emits
+    # one LLM-written narrative anchored on those numbers.
+    "risk_mode": "tradingagents",
+    # TradingGroup-only knobs (ignored when risk_mode == "tradingagents").
+    # risk_vol_window: trailing trading sessions used to estimate daily σ
+    # of log-returns. Default 10 matches the paper; sweep {5,10,20,30} as
+    # a sensitivity ablation.
+    "risk_vol_window": 10,
+    # Style-specific multipliers (m_s^sl, m_s^tp) applied to σ_d,N to
+    # produce percentage thresholds. Keys match the FE's trading_style
+    # values. "day" respects the T+2.5 microstructure floor — multiplier
+    # bounded below by sqrt(2.5) ≈ 1.58 since the position cannot be
+    # exited before T+2 afternoon on VN cash equities.
+    "risk_multipliers": {
+        "day":   {"sl": 1.5, "tp": 2.5},
+        "swing": {"sl": 2.5, "tp": 4.0},
+    },
+    # Fallback σ when a symbol lacks enough history (newly listed) or the
+    # OHLCV fetch fails. ~3% daily is roughly the long-run VN small-cap mean.
+    "risk_sigma_fallback": 0.03,
 }

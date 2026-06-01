@@ -159,6 +159,7 @@ class TradingAgentsGraph:
             self.tool_nodes,
             self.tool_lists,
             self.conditional_logic,
+            risk_mode=self.config.get("risk_mode", "tradingagents"),
         )
 
         self.propagator = Propagator()

@@ -60,6 +60,14 @@ def _build_config(payload: Dict[str, Any]) -> Dict[str, Any]:
     cfg["output_language"] = payload.get("output_language", "English")
     cfg["checkpoint_enabled"] = bool(payload.get("checkpoint_enabled", False))
     cfg["trading_style"] = payload.get("trading_style", "swing")
+    # TradingGroup risk-module toggle. Defaults to legacy "tradingagents"
+    # (3-debator LLM chain) so existing behavior is preserved unless the
+    # caller explicitly opts in.
+    cfg["risk_mode"] = payload.get("risk_mode", "tradingagents")
+    if payload.get("risk_vol_window") is not None:
+        cfg["risk_vol_window"] = int(payload["risk_vol_window"])
+    if payload.get("risk_multipliers"):
+        cfg["risk_multipliers"] = payload["risk_multipliers"]
     cfg["agent_models"] = payload.get("agent_models") or {}
     return cfg
 

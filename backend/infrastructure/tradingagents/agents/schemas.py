@@ -204,6 +204,24 @@ class PortfolioDecision(BaseModel):
         default=None,
         description="Optional recommended holding period, e.g. '3-6 months'.",
     )
+    stop_loss_pct: Optional[float] = Field(
+        default=None,
+        description=(
+            "Stop-loss threshold as a percentage (e.g. 4.5 means 4.5%). "
+            "Populated by the quant risk module in TradingGroup mode; None in "
+            "TradingAgents mode. When provided in the risk debate history, "
+            "echo the same number here."
+        ),
+    )
+    take_profit_pct: Optional[float] = Field(
+        default=None,
+        description=(
+            "Take-profit threshold as a percentage. Populated by the quant "
+            "risk module in TradingGroup mode; None in TradingAgents mode. "
+            "When provided in the risk debate history, echo the same number "
+            "here."
+        ),
+    )
 
 
 def render_pm_decision(decision: PortfolioDecision) -> str:
@@ -225,4 +243,8 @@ def render_pm_decision(decision: PortfolioDecision) -> str:
         parts.extend(["", f"**Price Target**: {decision.price_target}"])
     if decision.time_horizon:
         parts.extend(["", f"**Time Horizon**: {decision.time_horizon}"])
+    if decision.stop_loss_pct is not None:
+        parts.extend(["", f"**Stop Loss**: {decision.stop_loss_pct:.2f}%"])
+    if decision.take_profit_pct is not None:
+        parts.extend(["", f"**Take Profit**: {decision.take_profit_pct:.2f}%"])
     return "\n".join(parts)

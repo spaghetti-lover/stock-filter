@@ -19,12 +19,20 @@ class GraphSetup:
         tool_nodes: Dict[str, ToolNode],
         tool_lists: Dict[str, list],
         conditional_logic: ConditionalLogic,
+        risk_mode: str = "tradingagents",
     ):
-        """Initialize with per-agent LLMs (keyed by canonical agent name)."""
+        """Initialize with per-agent LLMs (keyed by canonical agent name).
+
+        Args:
+            risk_mode: "tradingagents" (default) wires the legacy 3-debator
+                LLM chain. "tradinggroup" wires a single deterministic quant
+                risk node between Trader and Portfolio Manager.
+        """
         self.agent_llms = agent_llms
         self.tool_nodes = tool_nodes
         self.tool_lists = tool_lists
         self.conditional_logic = conditional_logic
+        self.risk_mode = risk_mode
 
     def setup_graph(
         self, selected_analysts=["market", "social", "news", "fundamentals"]
@@ -87,10 +95,14 @@ class GraphSetup:
         research_manager_node = create_research_manager(self.agent_llms["research_manager"])
         trader_node = create_trader(self.agent_llms["trader"])
 
-        # Create risk analysis nodes
-        aggressive_analyst = create_aggressive_debator(self.agent_llms["aggressive"])
-        neutral_analyst = create_neutral_debator(self.agent_llms["neutral"])
-        conservative_analyst = create_conservative_debator(self.agent_llms["conservative"])
+        # Create risk analysis nodes. In TradingGroup mode only the quant
+        # node is built; the three debators are not instantiated.
+        if self.risk_mode == "tradinggroup":
+            quant_risk_node = create_quant_risk_node(self.agent_llms["aggressive"])
+        else:
+            aggressive_analyst = create_aggressive_debator(self.agent_llms["aggressive"])
+            neutral_analyst = create_neutral_debator(self.agent_llms["neutral"])
+            conservative_analyst = create_conservative_debator(self.agent_llms["conservative"])
         portfolio_manager_node = create_portfolio_manager(self.agent_llms["portfolio_manager"])
 
         # Create workflow
@@ -109,9 +121,12 @@ class GraphSetup:
         workflow.add_node("Bear Researcher", bear_researcher_node)
         workflow.add_node("Research Manager", research_manager_node)
         workflow.add_node("Trader", trader_node)
-        workflow.add_node("Aggressive Analyst", aggressive_analyst)
-        workflow.add_node("Neutral Analyst", neutral_analyst)
-        workflow.add_node("Conservative Analyst", conservative_analyst)
+        if self.risk_mode == "tradinggroup":
+            workflow.add_node("Quant Risk Module", quant_risk_node)
+        else:
+            workflow.add_node("Aggressive Analyst", aggressive_analyst)
+            workflow.add_node("Neutral Analyst", neutral_analyst)
+            workflow.add_node("Conservative Analyst", conservative_analyst)
         workflow.add_node("Portfolio Manager", portfolio_manager_node)
 
         # Define edges
@@ -158,31 +173,36 @@ class GraphSetup:
             },
         )
         workflow.add_edge("Research Manager", "Trader")
-        workflow.add_edge("Trader", "Aggressive Analyst")
-        workflow.add_conditional_edges(
-            "Aggressive Analyst",
-            self.conditional_logic.should_continue_risk_analysis,
-            {
-                "Conservative Analyst": "Conservative Analyst",
-                "Portfolio Manager": "Portfolio Manager",
-            },
-        )
-        workflow.add_conditional_edges(
-            "Conservative Analyst",
-            self.conditional_logic.should_continue_risk_analysis,
-            {
-                "Neutral Analyst": "Neutral Analyst",
-                "Portfolio Manager": "Portfolio Manager",
-            },
-        )
-        workflow.add_conditional_edges(
-            "Neutral Analyst",
-            self.conditional_logic.should_continue_risk_analysis,
-            {
-                "Aggressive Analyst": "Aggressive Analyst",
-                "Portfolio Manager": "Portfolio Manager",
-            },
-        )
+        if self.risk_mode == "tradinggroup":
+            # Single deterministic risk node — straight line to PM.
+            workflow.add_edge("Trader", "Quant Risk Module")
+            workflow.add_edge("Quant Risk Module", "Portfolio Manager")
+        else:
+            workflow.add_edge("Trader", "Aggressive Analyst")
+            workflow.add_conditional_edges(
+                "Aggressive Analyst",
+                self.conditional_logic.should_continue_risk_analysis,
+                {
+                    "Conservative Analyst": "Conservative Analyst",
+                    "Portfolio Manager": "Portfolio Manager",
+                },
+            )
+            workflow.add_conditional_edges(
+                "Conservative Analyst",
+                self.conditional_logic.should_continue_risk_analysis,
+                {
+                    "Neutral Analyst": "Neutral Analyst",
+                    "Portfolio Manager": "Portfolio Manager",
+                },
+            )
+            workflow.add_conditional_edges(
+                "Neutral Analyst",
+                self.conditional_logic.should_continue_risk_analysis,
+                {
+                    "Aggressive Analyst": "Aggressive Analyst",
+                    "Portfolio Manager": "Portfolio Manager",
+                },
+            )
 
         workflow.add_edge("Portfolio Manager", END)
 
