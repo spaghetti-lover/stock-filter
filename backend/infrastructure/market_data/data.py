@@ -37,6 +37,41 @@ class _RateLimiter:
 
 _limiter = _RateLimiter(calls_per_minute=450)
 
+
+# ── As-of clock (backtest look-ahead guard) ──────────────────────────────
+# When set, every date-windowed fetch below ends at this date instead of the
+# real wall clock. The backtest runner sets it per decision so the agent only
+# sees bars available on the historical trade_date — eliminating look-ahead
+# bias. Production never sets it, so behavior is unchanged (ends at now()).
+#
+# Backed by a ContextVar so it isolates correctly under BOTH threads and
+# asyncio tasks: each concurrent ticker-lane runs in its own task and sets its
+# own as-of date; the value propagates into every awaited tool call in that
+# task without leaking across the 5 concurrent lanes.
+import contextvars  # noqa: E402
+
+_as_of_var: "contextvars.ContextVar[str | None]" = contextvars.ContextVar(
+    "market_data_as_of", default=None
+)
+
+
+def set_as_of(date_str: str | None) -> None:
+    """Pin the as-of date (YYYY-MM-DD) for the current context, or clear."""
+    _as_of_var.set(date_str)
+
+
+def get_as_of() -> str | None:
+    return _as_of_var.get()
+
+
+def _now() -> datetime:
+    """Return the as-of datetime for this context, else the real now()."""
+    pinned = _as_of_var.get()
+    if pinned:
+        return datetime.strptime(pinned, "%Y-%m-%d")
+    return datetime.now()
+
+
 def get_all_symbols() -> list[dict]:
     """Get all stock symbols from HOSE and HNX exchanges."""
     log.debug("Fetching all symbols")
@@ -52,8 +87,8 @@ def get_trading_history(symbol: str, days: int = 100) -> list[dict]:
     """Get daily OHLCV history for a symbol."""
     log.debug("Fetching trading history: symbol=%s days=%d", symbol, days)
     _limiter.acquire()
-    end = datetime.now().strftime("%Y-%m-%d")
-    start = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+    end = _now().strftime("%Y-%m-%d")
+    start = (_now() - timedelta(days=days)).strftime("%Y-%m-%d")
     try:
         df = Market().equity(symbol).ohlcv(start=start, end=end)
     except (ValueError, ConnectionResetError, ConnectionError):
@@ -66,8 +101,8 @@ def get_vnindex_history(days: int = 40) -> list[dict]:
     """Get daily OHLCV for VNINDEX (40-day window gives headroom for 20-session MA)."""
     log.debug("Fetching VNINDEX history: days=%d", days)
     _limiter.acquire()
-    end = datetime.now().strftime("%Y-%m-%d")
-    start = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+    end = _now().strftime("%Y-%m-%d")
+    start = (_now() - timedelta(days=days)).strftime("%Y-%m-%d")
     try:
         df = Market().equity("VNINDEX").ohlcv(start=start, end=end)
     except (ValueError, ConnectionResetError, ConnectionError):
@@ -93,8 +128,8 @@ def get_foreign_flow(symbol: str, days: int = 10) -> list[dict]:
     """Get foreign buy/sell value per session (last N calendar days → ~5 trading sessions)."""
     log.debug("Fetching foreign_flow: symbol=%s days=%d", symbol, days)
     _limiter.acquire()
-    end = datetime.now().strftime("%Y-%m-%d")
-    start = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+    end = _now().strftime("%Y-%m-%d")
+    start = (_now() - timedelta(days=days)).strftime("%Y-%m-%d")
     try:
         df = Market().equity(symbol).foreign_flow(start=start, end=end)
     except Exception:
@@ -107,8 +142,8 @@ def get_proprietary_flow(symbol: str, days: int = 10) -> list[dict]:
     """Get proprietary (tự doanh) buy/sell value per session."""
     log.debug("Fetching proprietary_flow: symbol=%s days=%d", symbol, days)
     _limiter.acquire()
-    end = datetime.now().strftime("%Y-%m-%d")
-    start = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+    end = _now().strftime("%Y-%m-%d")
+    start = (_now() - timedelta(days=days)).strftime("%Y-%m-%d")
     try:
         df = Market().equity(symbol).proprietary_flow(start=start, end=end)
     except Exception:
@@ -191,7 +226,7 @@ def get_smart_money_raw(symbol: str, days: int) -> tuple[list[dict], str | None]
     log.debug("Fetching smart_money_raw: symbol=%s days=%d", symbol, days)
     # Pad the calendar window so we get at least `days` trading sessions back.
     pad = max(int(days * 2), days + 30)
-    end_dt = datetime.now()
+    end_dt = _now()
     start_dt = end_dt - timedelta(days=pad)
     end = end_dt.strftime("%Y-%m-%d")
     start = start_dt.strftime("%Y-%m-%d")

@@ -1,0 +1,146 @@
+{
+  "experiment": "TraderAgent backtest \u2014 VN equities (Qwen)",
+  "generated_at": "2026-06-01T18:41:30+00:00",
+  "params": {
+    "horizon_days": 5,
+    "cost_round_trip": 0.006,
+    "position_fraction": 0.1,
+    "max_concurrent": 10,
+    "variants": [
+      "full"
+    ],
+    "n_decisions": 2
+  },
+  "rows": [
+    {
+      "strategy": "Buy & Hold VN-Index",
+      "kind": "baseline",
+      "cost_pct": 0.0,
+      "cumulative_return": 0.4232,
+      "sharpe": 1.39,
+      "max_drawdown": -0.1811,
+      "n_trades": 1
+    },
+    {
+      "strategy": "Buy & Hold VN-Index",
+      "kind": "baseline",
+      "cost_pct": 0.006,
+      "cumulative_return": 0.4232,
+      "sharpe": 1.39,
+      "max_drawdown": -0.1811,
+      "n_trades": 1
+    },
+    {
+      "strategy": "Equal-weight VN30",
+      "kind": "baseline",
+      "cost_pct": 0.0,
+      "cumulative_return": 0.3903,
+      "sharpe": 1.3,
+      "max_drawdown": -0.1816,
+      "n_trades": 1
+    },
+    {
+      "strategy": "Equal-weight VN30",
+      "kind": "baseline",
+      "cost_pct": 0.006,
+      "cumulative_return": 0.3903,
+      "sharpe": 1.3,
+      "max_drawdown": -0.1816,
+      "n_trades": 1
+    },
+    {
+      "strategy": "SMA(10/50) crossover",
+      "kind": "baseline",
+      "cost_pct": 0.0,
+      "cumulative_return": 0.3614,
+      "sharpe": 1.13,
+      "max_drawdown": -0.2394,
+      "n_trades": 120
+    },
+    {
+      "strategy": "SMA(10/50) crossover",
+      "kind": "baseline",
+      "cost_pct": 0.006,
+      "cumulative_return": 0.329,
+      "sharpe": 1.05,
+      "max_drawdown": -0.2426,
+      "n_trades": 120
+    },
+    {
+      "strategy": "TraderAgent (full)",
+      "kind": "traderagent",
+      "variant": "full",
+      "cost_pct": 0.0,
+      "n_trades": 1,
+      "cumulative_return": 0.000323,
+      "sharpe": 0.0,
+      "max_drawdown": 0.0,
+      "win_rate": 1.0,
+      "avg_holding_days": 1.0,
+      "hit_rate": 0.0
+    },
+    {
+      "strategy": "TraderAgent (full)",
+      "kind": "traderagent",
+      "variant": "full",
+      "cost_pct": 0.006,
+      "n_trades": 1,
+      "cumulative_return": -0.000277,
+      "sharpe": 0.0,
+      "max_drawdown": -0.000277,
+      "win_rate": 1.0,
+      "avg_holding_days": 1.0,
+      "hit_rate": 0.0
+    },
+    {
+      "strategy": "TraderAgent (no_t25_floor)",
+      "kind": "traderagent",
+      "variant": "no_t25",
+      "cost_pct": 0.0,
+      "n_trades": 1,
+      "cumulative_return": 0.000323,
+      "sharpe": 0.0,
+      "max_drawdown": 0.0,
+      "win_rate": 1.0,
+      "avg_holding_days": 1.0,
+      "hit_rate": 0.0
+    },
+    {
+      "strategy": "TraderAgent (no_t25_floor)",
+      "kind": "traderagent",
+      "variant": "no_t25",
+      "cost_pct": 0.006,
+      "n_trades": 1,
+      "cumulative_return": -0.000277,
+      "sharpe": 0.0,
+      "max_drawdown": -0.000277,
+      "win_rate": 1.0,
+      "avg_holding_days": 1.0,
+      "hit_rate": 0.0
+    }
+  ],
+  "summary": {
+    "ablations": {
+      "t25_floor": {
+        "with_floor_mdd": 0.0,
+        "without_floor_mdd": 0.0,
+        "mdd_delta": 0.0,
+        "with_floor_sharpe": 0.0,
+        "without_floor_sharpe": 0.0
+      },
+      "reflection_temporal": {
+        "available": false,
+        "reason": "too few trades"
+      }
+    },
+    "tokens_used": {
+      "in": 409601,
+      "out": 53994,
+      "total": 463595
+    },
+    "models_used": [
+      "qwen3-max",
+      "qwen3.5-plus-2026-02-15"
+    ]
+  }
+}

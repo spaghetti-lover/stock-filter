@@ -7,6 +7,7 @@ import { useStocksStore } from "@/lib/store";
 import { ProviderPicker } from "@/components/chat/ProviderPicker";
 import { ChatThread } from "@/components/chat/ChatThread";
 import { ChatComposer } from "@/components/chat/ChatComposer";
+import { ReflectionSidebar } from "@/components/chat/ReflectionSidebar";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { Banner } from "@/components/ui/Banner";
 import type { ChatMessage, Provider } from "@/lib/types";
@@ -73,6 +74,15 @@ export default function ChatPage() {
             {error}
           </Banner>
         ) : null}
+
+        {lastStocks.length ? (
+          <Banner tone="warn" label="T+2.5 settlement">
+            Vietnam cash equities settle on T+2.5. A position opened today cannot be
+            sold before T+2 afternoon — plan stop-loss and take-profit accordingly.
+          </Banner>
+        ) : null}
+
+        <ReflectionSidebar tickers={lastStocks.map((s) => s.symbol)} />
 
         <ChatThread messages={messages} pending={mutation.isPending} />
 

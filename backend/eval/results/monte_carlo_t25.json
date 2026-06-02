@@ -1,0 +1,74 @@
+{
+  "experiment": "Monte Carlo \u2014 T+2.5 stop-loss floor",
+  "generated_at": "2026-06-01T17:16:00+00:00",
+  "params": {
+    "universe": "VN30",
+    "m_grid": [
+      1.0,
+      1.2,
+      1.4,
+      1.4142,
+      1.5811,
+      1.7,
+      1.8,
+      2.0,
+      2.5
+    ],
+    "hold_sessions": 3,
+    "n_paths": 10000,
+    "floor": 1.5811,
+    "source": "csv-converted"
+  },
+  "rows": [
+    {
+      "m": 1.0,
+      "mean_stop_out": 0.305527,
+      "std_stop_out": 0.02923
+    },
+    {
+      "m": 1.2,
+      "mean_stop_out": 0.2536,
+      "std_stop_out": 0.026678
+    },
+    {
+      "m": 1.4,
+      "mean_stop_out": 0.209583,
+      "std_stop_out": 0.024541
+    },
+    {
+      "m": 1.4142,
+      "mean_stop_out": 0.205327,
+      "std_stop_out": 0.023902
+    },
+    {
+      "m": 1.5811,
+      "mean_stop_out": 0.174857,
+      "std_stop_out": 0.022602
+    },
+    {
+      "m": 1.7,
+      "mean_stop_out": 0.15689,
+      "std_stop_out": 0.021343
+    },
+    {
+      "m": 1.8,
+      "mean_stop_out": 0.141783,
+      "std_stop_out": 0.02056
+    },
+    {
+      "m": 2.0,
+      "mean_stop_out": 0.116997,
+      "std_stop_out": 0.018354
+    },
+    {
+      "m": 2.5,
+      "mean_stop_out": 0.071327,
+      "std_stop_out": 0.011009
+    }
+  ],
+  "summary": {
+    "floor_m": 1.5811,
+    "stop_out_at_floor": 0.1749,
+    "stop_out_at_m1": 0.3055
+  }
+}

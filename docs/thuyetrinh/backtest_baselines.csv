@@ -1,0 +1,7 @@
+strategy,cost_pct,CR,SR,MDD,n_trades
+Buy & Hold VN-Index,0.0%,+42.32%,+1.39,-18.11%,1
+Buy & Hold VN-Index,0.6%,+42.32%,+1.39,-18.11%,1
+Equal-weight VN30,0.0%,+39.03%,+1.30,-18.16%,1
+Equal-weight VN30,0.6%,+39.03%,+1.30,-18.16%,1
+SMA(10/50) crossover,0.0%,+36.14%,+1.13,-23.94%,120
+SMA(10/50) crossover,0.6%,+32.90%,+1.05,-24.26%,120

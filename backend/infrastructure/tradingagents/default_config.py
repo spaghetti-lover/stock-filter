@@ -51,7 +51,7 @@ DEFAULT_CONFIG = {
     # bounded below by sqrt(2.5) ≈ 1.58 since the position cannot be
     # exited before T+2 afternoon on VN cash equities.
     "risk_multipliers": {
-        "day":   {"sl": 1.5, "tp": 2.5},
+        "day":   {"sl": 1.6, "tp": 2.5},
         "swing": {"sl": 2.5, "tp": 4.0},
     },
     # Fallback σ when a symbol lacks enough history (newly listed) or the

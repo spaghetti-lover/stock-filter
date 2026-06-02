@@ -12,7 +12,7 @@ import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from presentation.api.routes import layer1, layer2, chat, trading_agent, symbols, discussions, ai_filter, smart_money
+from presentation.api.routes import layer1, layer2, chat, trading_agent, symbols, discussions, ai_filter, smart_money, reflections, experiments
 from db.connection import init_pool, close_pool
 from infrastructure.scheduler.scheduler import start_scheduler, stop_scheduler
 from infrastructure.container import (
@@ -75,3 +75,5 @@ app.include_router(trading_agent.router, tags=["Trading Agent"])
 app.include_router(symbols.router, tags=["Symbols"])
 app.include_router(discussions.router, tags=["Discussions"])
 app.include_router(ai_filter.router, tags=["AI Filter"])
+app.include_router(reflections.router, tags=["Reflections"])
+app.include_router(experiments.router, tags=["Experiments"])

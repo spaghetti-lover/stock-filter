@@ -91,7 +91,7 @@ def create_quant_risk_node(llm):
         fallback = float(config.get("risk_sigma_fallback", 0.03))
         style_in = config.get("trading_style", "swing")
         multipliers = config.get("risk_multipliers", {
-            "day":   {"sl": 1.5, "tp": 2.5},
+            "day":   {"sl": 1.6, "tp": 2.5},
             "swing": {"sl": 2.5, "tp": 4.0},
         })
 

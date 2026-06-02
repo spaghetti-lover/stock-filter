@@ -5,23 +5,40 @@ matching vnstock_ta Indicator method. Returns the last 20 trading sessions
 of the requested indicator as a list of {time, value} dicts.
 """
 
-from datetime import datetime, timedelta
-
 import pandas as pd
-from vnstock_data import Market
 from vnstock_ta import Indicator
+
+from infrastructure.market_data.data import get_trading_history
 
 
 _TAIL = 20
 
 
 def _load_ohlcv(symbol: str, days: int) -> pd.DataFrame:
-    end = datetime.now().strftime("%Y-%m-%d")
-    start = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
-    df = Market().equity(symbol).ohlcv(start=start, end=end)
-    if df is None or df.empty:
+    # Route through get_trading_history so the as-of clock (backtest
+    # look-ahead guard) applies here too — the Technical Analyst must not see
+    # bars after the decision date.
+    rows = get_trading_history(symbol, days=days)
+    if not rows:
         raise ValueError(f"No OHLCV data for {symbol} in the last {days} days")
-    return df.set_index("time")
+    df = pd.DataFrame(rows)
+    df = df.set_index("time")
+    # The API occasionally returns duplicate timestamps; pandas_ta's internal
+    # reindex (e.g. in macd()) raises on duplicate labels. Keep the last.
+    df = df[~df.index.duplicated(keep="last")].sort_index()
+    return df
+
+
+def _match_column(df: pd.DataFrame, prefix: str) -> str:
+    """Return the first column starting with ``prefix``.
+
+    pandas_ta column suffixes vary across versions (e.g. "_20_2" vs
+    "_20_2.0"); matching by stable prefix avoids brittle hardcoded names.
+    """
+    for col in df.columns:
+        if str(col).startswith(prefix):
+            return str(col)
+    raise KeyError(f"no column with prefix {prefix!r} in {list(df.columns)}")
 
 
 def _series_to_records(series: pd.Series) -> list[dict]:
@@ -58,16 +75,19 @@ def compute_indicator(symbol: str, indicator: str, days: int = 120) -> dict:
         macd_df = ind.macd()
         if macd_df is None:
             raise ValueError(f"MACD computation returned no data for {symbol}")
-        column = {"macd": "MACD_12_26_9", "macds": "MACDs_12_26_9", "macdh": "MACDh_12_26_9"}[name]
-        series = macd_df[column]
+        # Match by prefix — pandas_ta column suffixes drift across versions
+        # (e.g. "MACD_12_26_9"); prefix is stable.
+        prefix = {"macd": "MACD_", "macds": "MACDs_", "macdh": "MACDh_"}[name]
+        series = macd_df[_match_column(macd_df, prefix)]
     elif name == "rsi":
         series = ind.rsi(length=14)
     elif name in ("boll", "boll_ub", "boll_lb"):
         bb = ind.bbands(length=20, std=2)
         if bb is None:
             raise ValueError(f"Bollinger Bands computation returned no data for {symbol}")
-        column = {"boll": "BBM_20_2.0", "boll_ub": "BBU_20_2.0", "boll_lb": "BBL_20_2.0"}[name]
-        series = bb[column]
+        # Version-robust: BBM/BBU/BBL prefix (suffix is "_20_2" or "_20_2.0").
+        prefix = {"boll": "BBM_", "boll_ub": "BBU_", "boll_lb": "BBL_"}[name]
+        series = bb[_match_column(bb, prefix)]
     elif name == "atr":
         series = ind.atr(length=14)
     elif name == "vwma":

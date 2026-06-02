@@ -64,7 +64,9 @@ async def get_indicator(symbol: str, indicator: str, days: int = 120) -> dict:
 async def make_chart(
     symbol: str,
     chart_type: str = "candlestick",
-    indicators: list[str] | None = None,
+    # Accept str too: some LLMs (Qwen 3.5 Flash in particular) stringify list
+    # args as JSON, e.g. '["sma:20","rsi:14"]'. The body coerces it back.
+    indicators: list[str] | str | None = None,
     days: int = 120,
 ) -> dict:
     """Build a chart payload (OHLCV + indicators) for rendering in the chat UI.
@@ -94,6 +96,15 @@ async def make_chart(
             "error": f"unsupported chart_type: {chart_type}",
             "supported_chart_types": list(SUPPORTED_CHART_TYPES),
         }
+    # Normalize `indicators` to a real list — some LLMs hand us a JSON-string.
+    if isinstance(indicators, str):
+        s = indicators.strip()
+        try:
+            import json as _json
+            parsed = _json.loads(s)
+            indicators = parsed if isinstance(parsed, list) else [s]
+        except Exception:
+            indicators = [t.strip() for t in s.strip("[]").split(",") if t.strip()]
     try:
         return await asyncio.to_thread(
             build_chart, symbol, chart_type, indicators or [], days
