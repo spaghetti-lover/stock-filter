@@ -78,6 +78,7 @@ def compute_stock_metrics(
     history_rows: list[dict],
     intraday_rows: list[dict],
     expected_fraction: float,
+    status: str = "normal",
 ) -> Stock | None:
     """Compute all stock metrics from raw OHLCV + intraday data.
 
@@ -105,7 +106,7 @@ def compute_stock_metrics(
     return Stock(
         symbol=symbol,
         exchange=exchange,
-        status="normal",
+        status=status,
         price=current_price,
         gtgd20=gtgd20,
         history_sessions=history_sessions,
@@ -152,7 +153,7 @@ async def fetch_all_stocks_live(
                 intraday_fut = loop.run_in_executor(executor, get_intraday, symbol)
                 history_rows, intraday_rows = await asyncio.gather(history_fut, intraday_fut)
 
-                stock = compute_stock_metrics(symbol, exchange, history_rows, intraday_rows, expected_fraction)
+                stock = compute_stock_metrics(symbol, exchange, history_rows, intraday_rows, expected_fraction, item.get("status", "normal"))
                 if stock is None:
                     log.debug("No history for %s, skipping", symbol)
                     result = (symbol, exchange, "No trading history available")

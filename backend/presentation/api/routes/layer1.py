@@ -13,7 +13,7 @@ router = APIRouter()
 
 @router.get("/layer1", response_model=FilteredStocksResponse)
 async def get_layer1(
-    exchanges: list[str] = Query(default=["HOSE", "HNX", "UPCOM"]),
+    exchanges: list[str] = Query(default=["HOSE", "HNX"]),
     min_gtgd: float = Query(default=0.0, ge=0.0),
     statuses: list[str] | None = Query(default=None),
     min_history: int = Query(default=0, ge=0),
@@ -64,7 +64,7 @@ async def get_layer1(
 
 @router.get("/layer1/stream")
 async def stream_layer1(
-    exchanges: list[str] = Query(default=["HOSE", "HNX", "UPCOM"]),
+    exchanges: list[str] = Query(default=["HOSE", "HNX"]),
     min_gtgd: float = Query(default=0.0, ge=0.0),
     statuses: list[str] | None = Query(default=None),
     min_history: int = Query(default=0, ge=0),

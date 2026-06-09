@@ -43,7 +43,10 @@ def get_all_symbols() -> list[dict]:
     _limiter.acquire()
     df = Reference().equity.list_by_exchange()
     df = df[df["exchange"].isin(["HOSE", "HNX"])]
-    symbols = df[["symbol", "exchange"]].to_dict(orient="records")
+    cols = ["symbol", "exchange"]
+    if "status" in df.columns:
+        cols.append("status")
+    symbols = df[cols].to_dict(orient="records")
     log.info("Fetched %d symbols", len(symbols))
     return symbols
 
