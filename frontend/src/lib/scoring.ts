@@ -31,10 +31,11 @@ export const DEFAULT_WEIGHTS: Weights = {
   ma_ma50: 0.20,
   ma_alignment: 0.20,
   ma_slope: 0.25,
+
   rs_3m: 0.35,
   rs_1m: 0.65,
-  tech_rsi: 0.50,
-  tech_macd: 0.50,
+  tech_rsi: 0.60,
+  tech_macd: 0.40,
 };
 
 export function normalize(weights: Weights, keys: string[]): Weights {

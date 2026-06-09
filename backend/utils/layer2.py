@@ -46,8 +46,8 @@ DEFAULT_WEIGHTS = {
     "mom_volatility": 0.30, "mom_ma": 0.20, "mom_rs": 0.20, "mom_flow": 0.25, "mom_tech": 0.10,
     "flow_ad": 0.40, "flow_smf": 0.60,
     "brk_price": 0.30, "brk_vol": 0.25, "brk_dryup": 0.20, "brk_base": 0.15, "brk_closing_strength": 0.10,
-    "composite_1d": 0.25, "composite_5d": 0.45, "composite_20d": 0.30,
-    "ma_ma20": 0.35, "ma_ma50": 0.30, "ma_slope": 0.35,
+    "composite_1d": 0.15, "composite_5d": 0.50, "composite_20d": 0.35,
+    "ma_ma20": 0.35, "ma_ma50": 0.20, "ma_alignment": 0.20, "ma_slope": 0.25,
     "rs_3m": 0.35, "rs_1m": 0.65,
     "tech_rsi": 0.60, "tech_macd": 0.40,
 }
@@ -637,7 +637,7 @@ def cal_return_n_days(close_today, close_n_days_ago):
     return (close_today - close_n_days_ago) / close_n_days_ago * 100
 
 def cal_composite_return(return_1d, return_5d, return_20d):
-    return 0.50 * return_1d + 0.30 * return_5d + 0.20 * return_20d
+    return 0.15 * return_1d + 0.50 * return_5d + 0.35 * return_20d
 
 def score_return_1d(r: float) -> float:
     if r < -1:   return 0
