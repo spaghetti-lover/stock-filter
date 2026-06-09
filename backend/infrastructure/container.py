@@ -1,6 +1,5 @@
 from application.services.crawl_service import CrawlUseCase
 from application.services.discussion_crawl_service import DiscussionCrawlUseCase
-from application.use_case.ai_filter_use_case import AIFilterUseCase
 from application.use_case.layer1_use_case import Layer1UseCase
 from application.use_case.layer2_use_case import Layer2UseCase
 from application.use_case.smart_money_flow_use_case import SmartMoneyFlowUseCase
@@ -60,9 +59,3 @@ def get_discussion_crawl_usecase() -> DiscussionCrawlUseCase:
     return _discussion_usecase
 
 
-def get_ai_filter_usecase(provider: str = "claude") -> AIFilterUseCase:
-    from infrastructure.agents.factory import get_agent_provider
-    from infrastructure.tools import ToolSet
-
-    agent = get_agent_provider(provider, toolset=ToolSet(names=()))
-    return AIFilterUseCase(provider=agent, repo=Layer1StockRepositoryDB())

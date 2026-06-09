@@ -170,7 +170,7 @@ export default function AgentPage() {
           <div className="px-8 pb-8 pt-12">
             <div className="flex items-center gap-3 text-[var(--color-text-dim)]">
               <span className="mono text-[10px]">AGNT/00</span>
-              <span className="tag">Agent Trader · session</span>
+              <span className="tag">Trading Agent · session</span>
             </div>
             <h1
               className="display mt-3 text-[40px] leading-[0.95] tracking-tight md:text-[48px]"

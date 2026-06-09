@@ -7,7 +7,7 @@ const NAV = [
   { href: "/layer1", label: "Layer 01", title: "Hard filters" },
   { href: "/layer2", label: "Layer 02", title: "BUY score" },
   { href: "/layer2/log", label: "Layer 02", title: "Log breakdown" },
-  { href: "/agent", label: "Agent", title: "Agent Trader" },
+  { href: "/agent", label: "Agent", title: "Trading Agent" },
   { href: "/chat", label: "Assistant", title: "Stock chat" },
 ];
 
@@ -34,7 +34,7 @@ export function TopNav() {
             <span className="mono text-[11px] tracking-[0.22em] text-[var(--color-text-dim)]">
               VN/STOCK
             </span>
-            <span className="display text-[15px] tracking-tight">Agent Trader</span>
+            <span className="display text-[15px] tracking-tight">Trading Agent</span>
           </div>
         </Link>
         {/* Routes */}
