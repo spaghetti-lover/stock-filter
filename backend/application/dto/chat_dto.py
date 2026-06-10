@@ -10,6 +10,7 @@ class ChatRequest(BaseModel):
     messages: list[ChatMessage]
     stocks_context: list[dict] | None = None
     provider: str = "claude"
+    model: str | None = None
 
 
 class ChatResponse(BaseModel):

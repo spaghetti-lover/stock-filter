@@ -21,6 +21,7 @@ export async function postChat(payload: {
   messages: ChatMessage[];
   stocks_context: unknown[] | null;
   provider: Provider;
+  model?: string;
 }): Promise<{ response: string; provider: string }> {
   const res = await fetch(`${API_BASE}/chat`, {
     method: "POST",

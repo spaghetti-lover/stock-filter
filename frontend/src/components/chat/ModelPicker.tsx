@@ -1,23 +1,21 @@
 "use client";
 
 import type { Provider } from "@/lib/types";
+import { MODEL_OPTIONS } from "./modelCatalog";
 
-const OPTIONS: { value: Provider; label: string }[] = [
-  { value: "claude", label: "Claude" },
-  { value: "gemini", label: "Gemini" },
-  { value: "qwen", label: "Qwen" },
-];
-
-export function ProviderPicker({
+export function ModelPicker({
+  provider,
   value,
   onChange,
 }: {
-  value: Provider;
-  onChange: (p: Provider) => void;
+  provider: Provider;
+  value: string;
+  onChange: (m: string) => void;
 }) {
+  const options = MODEL_OPTIONS[provider];
   return (
     <div className="flex border border-[var(--color-line-2)]">
-      {OPTIONS.map((o) => {
+      {options.map((o) => {
         const active = value === o.value;
         return (
           <button

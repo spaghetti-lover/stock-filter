@@ -5,6 +5,8 @@ import { useMutation } from "@tanstack/react-query";
 import { postChat } from "@/lib/api";
 import { useStocksStore } from "@/lib/store";
 import { ProviderPicker } from "@/components/chat/ProviderPicker";
+import { ModelPicker } from "@/components/chat/ModelPicker";
+import { DEFAULT_MODEL } from "@/components/chat/modelCatalog";
 import { ChatThread } from "@/components/chat/ChatThread";
 import { ChatComposer } from "@/components/chat/ChatComposer";
 import { SectionHeader } from "@/components/ui/SectionHeader";
@@ -12,7 +14,12 @@ import { Banner } from "@/components/ui/Banner";
 import type { ChatMessage, Provider } from "@/lib/types";
 
 export default function ChatPage() {
-  const [provider, setProvider] = useState<Provider>("claude");
+  const [provider, setProviderRaw] = useState<Provider>("claude");
+  const [model, setModel] = useState<string>(DEFAULT_MODEL["claude"]);
+  const setProvider = (p: Provider) => {
+    setProviderRaw(p);
+    setModel(DEFAULT_MODEL[p]);
+  };
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
   const lastStocks = useStocksStore((s) => s.lastStocks);
@@ -23,6 +30,7 @@ export default function ChatPage() {
         messages: next,
         stocks_context: lastStocks.length ? lastStocks : null,
         provider,
+        model,
       }),
     onError: (e: unknown) => setError(e instanceof Error ? e.message : String(e)),
     onSuccess: (res) => {
@@ -46,7 +54,12 @@ export default function ChatPage() {
             eyebrow="Assistant · multi-provider"
             title="Talk to your screen."
             description="A short-context assistant that reads your last Layer 1 result. Switch providers freely — the conversation persists across the swap."
-            right={<ProviderPicker value={provider} onChange={setProvider} />}
+            right={
+              <div className="flex flex-col items-end gap-2">
+                <ProviderPicker value={provider} onChange={setProvider} />
+                <ModelPicker provider={provider} value={model} onChange={setModel} />
+              </div>
+            }
           />
         </div>
       </div>

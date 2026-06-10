@@ -132,4 +132,4 @@ export interface ChatMessage {
   role: ChatRole;
   content: string;
 }
-export type Provider = "claude" | "gemini";
+export type Provider = "claude" | "gemini" | "qwen";
