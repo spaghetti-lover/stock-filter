@@ -2,6 +2,7 @@ from domain.repositories.layer1_stock_repository import ProgressCallback, Layer1
 from application.mappers.stock_mapper import StockMapper
 from application.mappers.market_regime_mapper import MarketRegimeMapper
 from application.dto.stock_dto import FilteredStocksResponse, GetStockResponse
+from application.layer1 import FilterCriteria
 from application.services.stock_filter import apply_filters
 from logger import get_logger
 
@@ -21,23 +22,7 @@ class Layer1UseCase:
 
     async def execute(
         self,
-        exchanges: set[str] | None = None,
-        min_gtgd: float = 0.0,
-        statuses: set[str] | None = None,
-        min_history: int = 0,
-        min_price: float = 0.0,
-        min_intraday_ratio: float = 0.0,
-        min_volume: float = 0.0,
-        use_exchange: bool = True,
-        use_gtgd20: bool = True,
-        use_status: bool = True,
-        use_history: bool = True,
-        use_price: bool = True,
-        use_intraday: bool = True,
-        use_volume: bool = True,
-        exclude_ceiling_floor: bool = True,
-        cv_cap: float = 200.0,
-        use_cv: bool = True,
+        criteria: FilterCriteria,
         market_regime_gate: bool = True,
         on_progress: ProgressCallback | None = None,
     ) -> FilteredStocksResponse:
@@ -55,11 +40,15 @@ class Layer1UseCase:
                 )
 
         # --- Per-symbol scan ---
-        min_gtgd_raw = min_gtgd * 1e9
+        # Repository pre-filters cheaply (gtgd / history) before the full per-stock fetch;
+        # passing 0 keeps everything when the rule is disabled.
+        repo_min_gtgd = criteria.min_gtgd_vnd or 0.0
+        repo_min_history = criteria.min_history or 0
+
         stocks, early_rejected = await self.repo.list_stocks(
-            exchanges=exchanges,
-            min_gtgd=min_gtgd_raw,
-            min_history_sessions=min_history if use_history else 0,
+            exchanges=criteria.exchanges,
+            min_gtgd=repo_min_gtgd,
+            min_history_sessions=repo_min_history,
             on_progress=on_progress,
         )
 
@@ -67,34 +56,14 @@ class Layer1UseCase:
         if not stocks and self.fallback_repo is not None:
             log.info("Primary repo returned no data, falling back to live fetch")
             stocks, early_rejected = await self.fallback_repo.list_stocks(
-                exchanges=exchanges,
-                min_gtgd=min_gtgd_raw,
-                min_history_sessions=min_history if use_history else 0,
+                exchanges=criteria.exchanges,
+                min_gtgd=repo_min_gtgd,
+                min_history_sessions=repo_min_history,
                 on_progress=on_progress,
             )
 
         responses = StockMapper.to_response_list(stocks)
-
-        passed, rejected = apply_filters(
-            responses,
-            exchanges=exchanges,
-            min_gtgd20=min_gtgd_raw,
-            allowed_statuses=statuses,
-            min_history=min_history,
-            min_price=min_price,
-            min_intraday_ratio=min_intraday_ratio,
-            min_volume=min_volume,
-            use_exchange=use_exchange,
-            use_gtgd20=use_gtgd20,
-            use_status=use_status,
-            use_history=use_history,
-            use_price=use_price,
-            use_intraday=use_intraday,
-            use_volume=use_volume,
-            exclude_ceiling_floor=exclude_ceiling_floor,
-            cv_cap=cv_cap,
-            use_cv=use_cv,
-        )
+        passed, rejected = apply_filters(responses, criteria)
 
         # Include early-rejected stocks (no history / below min_gtgd before full fetch)
         for symbol, exchange, reason in early_rejected:

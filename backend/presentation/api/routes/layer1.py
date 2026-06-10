@@ -4,11 +4,46 @@ import json
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from application.dto.stock_dto import FilteredStocksResponse
+from application.layer1 import FilterCriteria
 from infrastructure.container import get_live_layer1_usecase, get_cached_layer1_usecase, get_crawl_usecase
 from logger import get_logger
 
 log = get_logger(__name__)
 router = APIRouter()
+
+
+def _build_criteria(
+    exchanges: list[str],
+    min_gtgd: float,
+    statuses: list[str] | None,
+    min_history: int,
+    min_price: float,
+    min_intraday_ratio: float,
+    min_volume: float,
+    use_exchange: bool,
+    use_gtgd20: bool,
+    use_status: bool,
+    use_history: bool,
+    use_price: bool,
+    use_intraday: bool,
+    use_volume: bool,
+    exclude_ceiling_floor: bool,
+    cv_cap: float,
+    use_cv: bool,
+) -> FilterCriteria:
+    """Translate route-level query params (billions, thousands, on/off flags)
+    into a canonical-units FilterCriteria. None means rule disabled."""
+    return FilterCriteria(
+        exchanges=frozenset(exchanges) if use_exchange and exchanges else None,
+        statuses=frozenset(statuses) if use_status and statuses else None,
+        min_gtgd_vnd=min_gtgd * 1e9 if use_gtgd20 else None,
+        min_history=min_history if use_history else None,
+        min_price_vnd=min_price if use_price else None,
+        min_intraday_ratio=min_intraday_ratio if use_intraday else None,
+        min_volume_vnd=min_volume if use_volume else None,
+        cv_cap_pct=cv_cap if use_cv else None,
+        exclude_ceiling_floor=exclude_ceiling_floor,
+    )
 
 
 @router.get("/layer1", response_model=FilteredStocksResponse)
@@ -34,27 +69,13 @@ async def get_layer1(
 ):
     usecase = get_cached_layer1_usecase()
     log.info("GET /layer1 exchanges=%s min_gtgd=%s", exchanges, min_gtgd)
+    criteria = _build_criteria(
+        exchanges, min_gtgd, statuses, min_history, min_price, min_intraday_ratio, min_volume,
+        use_exchange, use_gtgd20, use_status, use_history, use_price, use_intraday, use_volume,
+        exclude_ceiling_floor, cv_cap, use_cv,
+    )
     try:
-        result = await usecase.execute(
-            exchanges=set(exchanges),
-            min_gtgd=min_gtgd,
-            statuses=set(statuses) if statuses else None,
-            min_history=min_history,
-            min_price=min_price,
-            min_intraday_ratio=min_intraday_ratio,
-            min_volume=min_volume,
-            use_exchange=use_exchange,
-            use_gtgd20=use_gtgd20,
-            use_status=use_status,
-            use_history=use_history,
-            use_price=use_price,
-            use_intraday=use_intraday,
-            use_volume=use_volume,
-            exclude_ceiling_floor=exclude_ceiling_floor,
-            cv_cap=cv_cap,
-            use_cv=use_cv,
-            market_regime_gate=market_regime_gate,
-        )
+        result = await usecase.execute(criteria=criteria, market_regime_gate=market_regime_gate)
         log.info("GET /layer1 -> %d passed, %d rejected", len(result.passed), len(result.rejected))
         return result
     except Exception as e:
@@ -84,6 +105,11 @@ async def stream_layer1(
     market_regime_gate: bool = Query(default=True),
 ):
     usecase = get_live_layer1_usecase(save=True)
+    criteria = _build_criteria(
+        exchanges, min_gtgd, statuses, min_history, min_price, min_intraday_ratio, min_volume,
+        use_exchange, use_gtgd20, use_status, use_history, use_price, use_intraday, use_volume,
+        exclude_ceiling_floor, cv_cap, use_cv,
+    )
     queue: asyncio.Queue[str | None] = asyncio.Queue()
 
     async def on_progress(processed: int, total: int, symbol: str) -> None:
@@ -93,23 +119,7 @@ async def stream_layer1(
     async def run() -> None:
         try:
             result = await usecase.execute(
-                exchanges=set(exchanges),
-                min_gtgd=min_gtgd,
-                statuses=set(statuses) if statuses else None,
-                min_history=min_history,
-                min_price=min_price,
-                min_intraday_ratio=min_intraday_ratio,
-                min_volume=min_volume,
-                use_exchange=use_exchange,
-                use_gtgd20=use_gtgd20,
-                use_status=use_status,
-                use_history=use_history,
-                use_price=use_price,
-                use_intraday=use_intraday,
-                use_volume=use_volume,
-                exclude_ceiling_floor=exclude_ceiling_floor,
-                cv_cap=cv_cap,
-                use_cv=use_cv,
+                criteria=criteria,
                 market_regime_gate=market_regime_gate,
                 on_progress=on_progress,
             )
