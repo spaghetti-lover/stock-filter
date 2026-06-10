@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from application.dto.stock_dto import FilteredStocksResponse
 from application.layer1 import FilterCriteria
-from infrastructure.container import get_live_layer1_usecase, get_cached_layer1_usecase, get_crawl_usecase
+from infrastructure.container import get_live_layer1_usecase, get_cached_layer1_usecase
 from logger import get_logger
 
 log = get_logger(__name__)
@@ -141,16 +141,3 @@ async def stream_layer1(
         await task
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
-
-
-@router.post("/crawl/trigger")
-async def trigger_crawl():
-    crawl = get_crawl_usecase()
-    asyncio.create_task(crawl.execute())
-    return {"status": "crawl started"}
-
-
-@router.get("/crawl/status")
-async def get_crawl_status():
-    crawl = get_crawl_usecase()
-    return await crawl.get_status()

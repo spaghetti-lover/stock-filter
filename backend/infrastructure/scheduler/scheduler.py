@@ -8,12 +8,9 @@ log = get_logger(__name__)
 _scheduler: AsyncIOScheduler | None = None
 
 
-def start_scheduler(crawl_fn, layer1_run_fn, layer2_refresh_fn, discussion_crawl_fn):
+def start_scheduler(layer1_run_fn, layer2_refresh_fn, discussion_crawl_fn):
     global _scheduler
     _scheduler = AsyncIOScheduler()
-
-    crawl_trigger = CronTrigger(hour=16, minute=0, timezone="Asia/Ho_Chi_Minh")
-    _scheduler.add_job(crawl_fn, crawl_trigger, id="daily_crawl", replace_existing=True)
 
     layer1_trigger = CronTrigger(hour=9, minute=0, timezone="Asia/Ho_Chi_Minh")
     _scheduler.add_job(
@@ -51,7 +48,7 @@ def start_scheduler(crawl_fn, layer1_run_fn, layer2_refresh_fn, discussion_crawl
 
     _scheduler.start()
     log.info(
-        "Scheduler started: daily crawl at 16:00, layer1 at 09:00, "
+        "Scheduler started: layer1 at 09:00, "
         "layer2 refresh 09:15–15:00 every 5 min, "
         "discussion crawl every 30 min (Asia/Ho_Chi_Minh)"
     )

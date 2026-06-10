@@ -16,7 +16,6 @@ from presentation.api.routes import layer1, layer2, chat, trading_agent, symbols
 from db.connection import init_pool, close_pool
 from infrastructure.scheduler.scheduler import start_scheduler, stop_scheduler
 from infrastructure.container import (
-    get_crawl_usecase,
     get_discussion_crawl_usecase,
     get_layer2_usecase,
     get_live_layer1_usecase,
@@ -32,7 +31,6 @@ async def lifespan(app: FastAPI):
     tool_registry = McpToolRegistry()
     await tool_registry.start()
     app.state.tool_registry = tool_registry
-    crawl_usecase = get_crawl_usecase()
     layer1_usecase = get_live_layer1_usecase(save=True)
     layer2_usecase = get_layer2_usecase()
     discussion_usecase = get_discussion_crawl_usecase()
@@ -43,7 +41,7 @@ async def lifespan(app: FastAPI):
     async def layer2_refresh():
         await layer2_usecase.execute(refresh=True)
 
-    start_scheduler(crawl_usecase.execute, layer1_run, layer2_refresh, discussion_usecase.execute)
+    start_scheduler(layer1_run, layer2_refresh, discussion_usecase.execute)
     asyncio.create_task(layer2_refresh())
     log.info("App started: DB pool, MCP tool registry, and scheduler initialized")
     yield
