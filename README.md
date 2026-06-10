@@ -31,7 +31,7 @@ Prereqs: Docker, [uv](https://github.com/astral-sh/uv) (Python), [Bun](https://b
    # → http://localhost:3000
    ```
 
-For production: `docker compose up -d --build`.
+For production: `docker compose up -d --build`. To make Stock Chat run with Claude. Read `docs/setup.md`
 
 ---
 
