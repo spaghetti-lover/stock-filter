@@ -1,19 +1,19 @@
 """
-Tests for layer2.py.
+Tests for domain/services/layer2_scoring.py.
 
 Unit tests cover scoring/calculation helpers with known boundary inputs.
 Integration tests fetch real VIC data and exercise cal_buy_score end-to-end.
 
 Run from backend/:
-    uv run python3 -B -m pytest backend/utils/layer2_test.py -v
+    uv run python3 -B -m pytest backend/domain/services/layer2_scoring_test.py -v
 """
 import sys
 import os
 import pytest
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
-from utils.layer2 import (
+from domain.services.layer2_scoring import (
     BuyScoreBreakdown,
     cal_buy_score,
     # Liquidity
@@ -174,13 +174,13 @@ class TestCalGtgdDaily:
         # gtgd = 50.0 * 1000 * 1_000_000 = 50_000_000_000 (50 tỷ VND)
         close = [50.0]
         volume = [1_000_000.0]
-        from utils.layer2 import cal_gtgd_daily
+        from domain.services.layer2_scoring import cal_gtgd_daily
         result = cal_gtgd_daily(close, volume)
         assert result == [50.0 * 1000 * 1_000_000]  # 50 tỷ VND
 
     def test_realistic_vic_like_values(self):
         # VIC is typically ~50 nghìn/share with ~2M volume → ~100 tỷ/day
-        from utils.layer2 import cal_gtgd_daily
+        from domain.services.layer2_scoring import cal_gtgd_daily
         close = [50.0] * 25    # 50 nghìn đồng/share
         volume = [2_000_000.0] * 25
         result = cal_gtgd_daily(close, volume)
@@ -216,13 +216,13 @@ class TestCalIntradayGtgd:
     def test_multiplies_price_by_1000(self):
         # price in intraday is also in thousands VND
         # price=50.0 → 50,000 VND/share; 1000 ticks of 100 shares
-        from utils.layer2 import cal_intraday_gtgd
+        from domain.services.layer2_scoring import cal_intraday_gtgd
         intraday = [{"price": 50.0, "volume": 100}] * 1000
         result = cal_intraday_gtgd(intraday)
         assert result == pytest.approx(50.0 * 1000 * 100 * 1000)  # 5 tỷ VND
 
     def test_empty_intraday_is_zero(self):
-        from utils.layer2 import cal_intraday_gtgd
+        from domain.services.layer2_scoring import cal_intraday_gtgd
         assert cal_intraday_gtgd([]) == 0
 
 

@@ -8,7 +8,7 @@ from infrastructure.market_data.data import (
 )
 from domain.services.stock_metrics import get_expected_fraction_at_time
 from infrastructure.concurrency import CONCURRENCY, executor
-from utils.layer2 import cal_buy_score
+from domain.services.layer2_scoring import cal_buy_score
 from logger import get_logger
 
 log = get_logger(__name__)
