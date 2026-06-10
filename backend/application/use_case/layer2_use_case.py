@@ -6,7 +6,8 @@ from domain.repositories.layer2_score_repository import Layer2ScoreRepository
 from infrastructure.market_data.data import (
     get_trading_history, get_intraday, get_vnindex_history, get_market_flow,
 )
-from infrastructure.persistence.stock_metrics import executor, CONCURRENCY, get_expected_fraction_at_time
+from domain.services.stock_metrics import get_expected_fraction_at_time
+from infrastructure.concurrency import CONCURRENCY, executor
 from utils.layer2 import cal_buy_score
 from logger import get_logger
 

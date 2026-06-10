@@ -4,7 +4,7 @@ from domain.entities.smart_money_flow_day import SmartMoneyFlowDay
 from domain.entities.smart_money_flow_series import SmartMoneyFlowSeries
 from domain.repositories.smart_money_flow_repository import SmartMoneyFlowRepository
 from infrastructure.market_data.data import get_smart_money_raw
-from infrastructure.persistence.stock_metrics import executor
+from infrastructure.concurrency import executor
 from logger import get_logger
 
 log = get_logger(__name__)

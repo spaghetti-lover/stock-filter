@@ -4,8 +4,9 @@ from db.connection import get_pool
 from domain.entities.stock import Stock
 from domain.repositories.layer1_stock_repository import EarlyRejected, ProgressCallback, Layer1StockRepository
 from domain.value_objects.market_regime import MarketRegime
+from domain.services.stock_metrics import compute_market_regime
+from infrastructure.concurrency import executor
 from infrastructure.market_data.data import get_vnindex_history
-from infrastructure.persistence.stock_metrics import executor, compute_market_regime
 
 
 class Layer1StockRepositoryDB(Layer1StockRepository):

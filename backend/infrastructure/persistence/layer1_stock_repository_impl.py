@@ -3,12 +3,11 @@ from datetime import datetime, timezone, timedelta
 
 from domain.entities.stock import Stock
 from domain.repositories.layer1_stock_repository import EarlyRejected, ProgressCallback, Layer1StockRepository
+from domain.services.stock_metrics import compute_market_regime, get_expected_fraction_at_time
 from domain.value_objects.market_regime import MarketRegime
+from infrastructure.concurrency import executor
 from infrastructure.market_data.data import get_vnindex_history
-from infrastructure.persistence.stock_metrics import (
-    executor, get_expected_fraction_at_time,
-    compute_market_regime, fetch_all_stocks_live,
-)
+from infrastructure.market_data.scan import scan_market
 from logger import get_logger
 
 log = get_logger(__name__)
@@ -25,7 +24,7 @@ class Layer1StockRepositoryImpl(Layer1StockRepository):
         now = datetime.now(tz=timezone(timedelta(hours=7)))
         expected_fraction = get_expected_fraction_at_time(now.hour, now.minute)
         log.info("list_stocks started: exchanges=%s min_gtgd=%s fraction=%.2f", exchanges, min_gtgd, expected_fraction)
-        return await fetch_all_stocks_live(
+        return await scan_market(
             exchanges, min_gtgd, min_history_sessions, expected_fraction, on_progress,
         )
 

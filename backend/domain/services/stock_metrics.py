@@ -1,0 +1,124 @@
+"""Pure-compute Layer 1 metrics.
+
+No I/O, no asyncio, no threading. Every function here takes plain dicts of
+raw market data (OHLCV rows, intraday ticks) and returns either a primitive,
+a value object, or an entity. This is the deep core that's worth testing
+exhaustively — the orchestration that fetches the data lives in
+infrastructure/market_data/scan.py.
+"""
+
+from domain.entities.stock import Stock
+from domain.value_objects.market_regime import MarketRegime
+
+
+# --- Intraday time fraction ----------------------------------------------------
+
+INTRADAY_TIME_SLOTS = [
+    (9, 0), (9, 30), (10, 0), (10, 30), (11, 0), (11, 30),
+    (13, 0), (13, 30), (14, 0), (14, 30), (15, 0),
+]
+INTRADAY_CUMULATIVE = [0.12, 0.22, 0.30, 0.37, 0.43, 0.48, 0.56, 0.65, 0.75, 0.86, 1.00]
+
+
+def get_expected_fraction_at_time(hour: int, minute: int) -> float:
+    """What fraction of a normal session's volume should have happened by now?
+    Linear interpolation between fixed slot anchors. Returns 0.0 before 9:00
+    and 1.0 after 15:00."""
+    if (hour, minute) < (9, 0):
+        return 0.0
+    for i, (h, m) in enumerate(INTRADAY_TIME_SLOTS):
+        if (hour, minute) <= (h, m):
+            if i == 0:
+                return INTRADAY_CUMULATIVE[0]
+            prev_h, prev_m = INTRADAY_TIME_SLOTS[i - 1]
+            elapsed = (hour * 60 + minute) - (prev_h * 60 + prev_m)
+            slot_len = (h * 60 + m) - (prev_h * 60 + prev_m)
+            ratio = elapsed / max(slot_len, 1)
+            return INTRADAY_CUMULATIVE[i - 1] + (INTRADAY_CUMULATIVE[i] - INTRADAY_CUMULATIVE[i - 1]) * ratio
+    return 1.0
+
+
+# --- Market regime -------------------------------------------------------------
+
+def compute_market_regime(rows: list[dict]) -> MarketRegime | None:
+    """Build a MarketRegime from the last 20 VN-Index sessions, or None
+    if there aren't enough rows."""
+    if not rows or len(rows) < 20:
+        return None
+    closes = [r["close"] for r in rows]
+    vnindex_close = closes[-1]
+    ma5 = sum(closes[-5:]) / 5
+    ma20 = sum(closes[-20:]) / 20
+    return MarketRegime.from_values(close=vnindex_close, ma5=ma5, ma20=ma20)
+
+
+# --- Stock metrics -------------------------------------------------------------
+
+# Daily price band per exchange (VND-quote regulation).
+_BAND = {"HOSE": 0.07, "HNX": 0.10, "UPCOM": 0.15}
+_CEILING_FLOOR_TOLERANCE = 0.005
+
+
+def detect_ceiling_floor(exchange: str, history_rows: list[dict]) -> tuple[bool, bool]:
+    """Return (is_ceiling, is_floor) for today's session based on yesterday's close
+    and the exchange's daily band."""
+    if len(history_rows) < 2:
+        return False, False
+    ref = history_rows[-2]["close"]
+    if not ref:
+        return False, False
+    band = _BAND.get(exchange, 0.07)
+    close = history_rows[-1]["close"]
+    ceiling = ref * (1 + band)
+    floor = ref * (1 - band)
+    is_ceiling = abs(close - ceiling) / ceiling <= _CEILING_FLOOR_TOLERANCE
+    is_floor = abs(close - floor) / floor <= _CEILING_FLOOR_TOLERANCE
+    return is_ceiling, is_floor
+
+
+def compute_stock_metrics(
+    symbol: str,
+    exchange: str,
+    history_rows: list[dict],
+    intraday_rows: list[dict],
+    expected_fraction: float,
+    status: str = "normal",
+) -> Stock | None:
+    """Compute Layer 1 metrics from raw OHLCV + intraday data.
+
+    Returns a Stock entity, or None if there is no history at all.
+    CV needs the full 20-session window; falls back to None when shorter.
+    """
+    if not history_rows:
+        return None
+
+    current_price = history_rows[-1]["close"]
+    history_sessions = len(history_rows)
+    last20_values = [r["close"] * 1000 * r["volume"] for r in history_rows[-20:]]
+    gtgd20 = sum(last20_values) / len(last20_values)
+
+    if len(last20_values) >= 20 and gtgd20 > 0:
+        variance = sum((x - gtgd20) ** 2 for x in last20_values) / len(last20_values)
+        cv = (variance ** 0.5 / gtgd20) * 100.0
+    else:
+        cv = None
+
+    today_value = sum(r["price"] * 1000 * r["volume"] for r in intraday_rows) if intraday_rows else 0.0
+    avg_intraday_expected = gtgd20 * expected_fraction
+
+    is_ceiling, is_floor = detect_ceiling_floor(exchange, history_rows)
+
+    return Stock(
+        symbol=symbol,
+        exchange=exchange,
+        status=status,
+        price=current_price,
+        gtgd20=gtgd20,
+        history_sessions=history_sessions,
+        today_value=today_value,
+        avg_intraday_expected=avg_intraday_expected,
+        intraday_ratio=today_value / avg_intraday_expected if avg_intraday_expected > 0 else None,
+        is_ceiling=is_ceiling,
+        is_floor=is_floor,
+        cv=cv,
+    )

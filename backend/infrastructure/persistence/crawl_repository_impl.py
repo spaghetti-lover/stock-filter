@@ -3,7 +3,8 @@ from datetime import datetime, timezone
 from db.connection import get_pool
 from domain.entities.stock import Stock
 from domain.repositories.crawl_repository import CrawlRepository
-from infrastructure.persistence.stock_metrics import fetch_all_stocks_live, save_stocks_to_db
+from infrastructure.market_data.scan import scan_market
+from infrastructure.persistence.stock_metrics_writer import save_stocks_to_db
 from logger import get_logger
 
 log = get_logger(__name__)
@@ -11,7 +12,7 @@ log = get_logger(__name__)
 
 class CrawlRepositoryImpl(CrawlRepository):
     async def crawl_all_stocks(self) -> list[Stock]:
-        stocks, _ = await fetch_all_stocks_live(expected_fraction=1.0)
+        stocks, _ = await scan_market(expected_fraction=1.0)
         log.info("Crawl complete: %d stocks computed", len(stocks))
         return stocks
 
