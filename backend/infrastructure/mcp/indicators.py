@@ -1,4 +1,5 @@
 import asyncio
+import json
 
 from fastmcp import FastMCP
 
@@ -64,7 +65,7 @@ async def get_indicator(symbol: str, indicator: str, days: int = 120) -> dict:
 async def make_chart(
     symbol: str,
     chart_type: str = "candlestick",
-    indicators: list[str] | None = None,
+    indicators: list[str] | str | None = None,
     days: int = 120,
 ) -> dict:
     """Build a chart payload (OHLCV + indicators) for rendering in the chat UI.
@@ -94,9 +95,25 @@ async def make_chart(
             "error": f"unsupported chart_type: {chart_type}",
             "supported_chart_types": list(SUPPORTED_CHART_TYPES),
         }
+    if isinstance(indicators, str):
+        s = indicators.strip()
+        if not s:
+            indicators_list: list[str] = []
+        elif s.startswith("["):
+            try:
+                parsed = json.loads(s)
+            except json.JSONDecodeError as e:
+                return {"error": f"indicators is not valid JSON: {e}"}
+            if not isinstance(parsed, list) or not all(isinstance(x, str) for x in parsed):
+                return {"error": "indicators must be a list of strings"}
+            indicators_list = parsed
+        else:
+            indicators_list = [p.strip() for p in s.split(",") if p.strip()]
+    else:
+        indicators_list = indicators or []
     try:
         return await asyncio.to_thread(
-            build_chart, symbol, chart_type, indicators or [], days
+            build_chart, symbol, chart_type, indicators_list, days
         )
     except (ValueError, ConnectionError, ConnectionResetError, AttributeError, KeyError) as e:
         return {

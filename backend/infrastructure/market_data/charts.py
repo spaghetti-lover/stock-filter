@@ -103,14 +103,20 @@ def _compute_indicator(ind: Indicator, name: str, params: dict) -> dict:
         bb = ind.bbands(length=params["length"], std=params["std"])
         if bb is None or bb.empty:
             raise ValueError("BBANDS produced no data")
-        sfx = f"_{params['length']}_{params['std']:.1f}"
+
+        def _bb_col(prefix: str) -> str:
+            col = next((c for c in bb.columns if c.startswith(prefix + "_")), None)
+            if col is None:
+                raise ValueError(f"Bollinger Bands column {prefix} not found; got {bb.columns.tolist()}")
+            return col
+
         return {
             "kind": "overlay",
             "name": f"BB({params['length']},{params['std']})",
             "series": {
-                "BB_upper": _series_values(bb[f"BBU{sfx}"]),
-                "BB_middle": _series_values(bb[f"BBM{sfx}"]),
-                "BB_lower": _series_values(bb[f"BBL{sfx}"]),
+                "BB_upper": _series_values(bb[_bb_col("BBU")]),
+                "BB_middle": _series_values(bb[_bb_col("BBM")]),
+                "BB_lower": _series_values(bb[_bb_col("BBL")]),
             },
         }
     if name == "rsi":

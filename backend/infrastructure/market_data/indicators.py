@@ -66,7 +66,10 @@ def compute_indicator(symbol: str, indicator: str, days: int = 120) -> dict:
         bb = ind.bbands(length=20, std=2)
         if bb is None:
             raise ValueError(f"Bollinger Bands computation returned no data for {symbol}")
-        column = {"boll": "BBM_20_2.0", "boll_ub": "BBU_20_2.0", "boll_lb": "BBL_20_2.0"}[name]
+        prefix = {"boll": "BBM", "boll_ub": "BBU", "boll_lb": "BBL"}[name]
+        column = next((c for c in bb.columns if c.startswith(prefix + "_")), None)
+        if column is None:
+            raise ValueError(f"Bollinger Bands column {prefix} not found; got {bb.columns.tolist()}")
         series = bb[column]
     elif name == "atr":
         series = ind.atr(length=14)
