@@ -3,12 +3,10 @@ from datetime import datetime, timezone
 
 from domain.entities.layer2_score import Layer2Score
 from domain.repositories.layer2_score_repository import Layer2ScoreRepository
-from infrastructure.market_data.data import (
-    get_trading_history, get_intraday, get_vnindex_history, get_market_flow,
-)
+from domain.repositories.market_data_repository import MarketDataRepository
 from domain.services.stock_metrics import get_expected_fraction_at_time
-from infrastructure.concurrency import CONCURRENCY, executor
 from domain.services.layer2_scoring import cal_buy_score
+from infrastructure.concurrency import CONCURRENCY, executor
 from logger import get_logger
 
 log = get_logger(__name__)
@@ -17,8 +15,9 @@ REFRESH_INTERVAL_SECONDS = 300
 
 
 class Layer2UseCase:
-    def __init__(self, repo: Layer2ScoreRepository):
+    def __init__(self, repo: Layer2ScoreRepository, market_data: MarketDataRepository):
         self.repo = repo
+        self.market_data = market_data
 
     async def execute(self, refresh: bool = False) -> dict:
         if not refresh:
@@ -34,7 +33,7 @@ class Layer2UseCase:
         log.info("Computing Layer 2 scores for %d passed symbols", len(symbols))
 
         loop = asyncio.get_event_loop()
-        vnindex_history = await loop.run_in_executor(executor, get_vnindex_history, 100)
+        vnindex_history = await loop.run_in_executor(executor, self.market_data.get_vnindex_history, 100)
         if not vnindex_history:
             raise ValueError("Could not fetch VN-Index history.")
 
@@ -42,7 +41,7 @@ class Layer2UseCase:
         # once per distinct exchange — vnstock_data >= 3.2.0 Insights().flow.*.
         # ~3 HTTP calls per exchange replace ~2 per-symbol calls × N symbols.
         exchanges = {item["exchange"] for item in symbols}
-        flow_futs = {ex: loop.run_in_executor(executor, get_market_flow, ex) for ex in exchanges}
+        flow_futs = {ex: loop.run_in_executor(executor, self.market_data.get_market_flow, ex) for ex in exchanges}
         flow_results = await asyncio.gather(*flow_futs.values())
         flow_by_exchange: dict[str, dict] = dict(zip(flow_futs.keys(), flow_results))
 
@@ -58,8 +57,8 @@ class Layer2UseCase:
             async with sem:
                 try:
                     fetch_days = int(65 * 365 / 252) + 15
-                    history_fut  = loop.run_in_executor(executor, get_trading_history, symbol, fetch_days)
-                    intraday_fut = loop.run_in_executor(executor, get_intraday, symbol)
+                    history_fut  = loop.run_in_executor(executor, self.market_data.get_trading_history, symbol, fetch_days)
+                    intraday_fut = loop.run_in_executor(executor, self.market_data.get_intraday, symbol)
                     history, intraday = await asyncio.gather(history_fut, intraday_fut)
 
                     if len(history) < 65:

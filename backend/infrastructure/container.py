@@ -8,6 +8,7 @@ from infrastructure.persistence.discussion_repository_impl import DiscussionRepo
 from infrastructure.persistence.layer1_stock_repository_db import Layer1StockRepositoryDB
 from infrastructure.persistence.layer1_stock_repository_impl import Layer1StockRepositoryImpl
 from infrastructure.persistence.layer2_score_repository_db import Layer2ScoreRepositoryDB
+from infrastructure.persistence.market_data_repository_impl import MarketDataRepositoryImpl
 from infrastructure.persistence.smart_money_flow_repository_impl import SmartMoneyFlowRepositoryImpl
 from infrastructure.persistence.stock_metrics_writer import save_stocks_to_db
 from infrastructure.scrapers.f247 import F247Scraper
@@ -40,7 +41,10 @@ def get_crawl_usecase() -> CrawlUseCase:
 
 
 def get_layer2_usecase() -> Layer2UseCase:
-    return Layer2UseCase(repo=Layer2ScoreRepositoryDB())
+    return Layer2UseCase(
+        repo=Layer2ScoreRepositoryDB(),
+        market_data=MarketDataRepositoryImpl(),
+    )
 
 
 def get_smart_money_flow_usecase() -> SmartMoneyFlowUseCase:
